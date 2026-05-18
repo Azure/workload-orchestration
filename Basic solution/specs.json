@@ -1,0 +1,18 @@
+{
+      "components": [
+        {
+          "name": "helmcomponent",
+          "type": "helm.v3",
+          "properties": {
+            "chart": {
+              "repo": "oci://ghcr.io/stefanprodan/charts/podinfo",
+              "version": "6.9.3",
+              "wait": true,
+              "timeout": "5m"
+            }
+          }
+        }
+      ]
+    
+
+}

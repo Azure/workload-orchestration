@@ -1,0 +1,15 @@
+{
+    "location": "eastus",
+    "properties": {
+        "capabilities": [
+            {
+                "name": "soap",
+                "description": "soap"
+            },
+            {
+                "name": "shampoo",
+                "description": "shampoo"
+            }
+        ]
+    }
+}

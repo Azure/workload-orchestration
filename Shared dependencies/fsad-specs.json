@@ -1,0 +1,17 @@
+{
+      "components": [
+        {
+          "name": "${{$property(DependencyConfig.DeploymentName)}}",
+          "type": "helm.v3",
+          "properties": {
+            "chart": {
+              "repo": "contosocm.azurecr.io/helm/fsad-featurizer",
+              "version": "0.8.0",
+              "wait": true,
+              "timeout": "5m"
+            }
+          }
+        }
+      ]
+   
+}

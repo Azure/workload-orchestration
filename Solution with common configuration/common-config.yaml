@@ -1,0 +1,6 @@
+schema:
+  name: CommonSchema
+  version: "1.0"
+configs:
+  SqlServerEndpoint: http://localhost/SqlServerEndpoint
+  LineHealthEndpoint: http://localhost/LineHealthEndpoint

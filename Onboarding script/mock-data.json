@@ -1,0 +1,94 @@
+{
+    "common": {
+        "resourceGroup": "MockDataRG",
+        "subscriptionId": "973x15x6-6x57-774x-x9x6-6x79x5x784xx",
+        "location": "eastus2",
+        "tenantId": "72x988xx-86x1-41xx-91xx-2d7xx011db47",
+        "providerAppId": "cba491bc-48c0-44a6-a6c7-23362a7f54a9"
+    },
+    "infraOnboarding": {
+        "arcLocation": "eastus2",
+        "aksClusterIdentity": "WO-Cluster-Identity03",
+        "aksClusterName": "WO-Cluster03",
+        "customLocationName": "custest03",
+        "customLocationNamespace": "custest03",
+        "contextResourceGroup": "Redmond",
+        "contextName": "Redmond-Context",
+        "contextSubscriptionId": "973x15x6-6x57-774x-x9x6-6x79x5x784xx",
+        "contextLocation": "eastus2euap",
+        "diagInfo": {
+            "diagnosticWorkspaceId": "",
+            "diagnosticResourceName": "default",
+            "diagnosticSettingName": "default"
+        },
+        "acrName": "",
+        "storageClassName": "",
+        "connectedRegistryName": "",
+        "connectedRegistryIp": "",
+        "connectedRegistryClientToken": "",
+        "storageSizeRequest": "",
+        "siteHierarchy": [
+            {
+                "siteName": "AzureRedmond",
+                "isRGSite": true,
+                "level": "factory",
+                "capabilityList": {
+                    "capabilities": [
+                        "azure-soap",
+                        "azure-shampoo"
+                    ]
+                },
+                "hierarchyLevels": {
+                    "levels": [
+                        "factory",
+                        "line"
+                    ]
+                },
+                "deploymentTargets": {
+                    "capabilities": [
+                        "azure-soap"
+                    ],
+                    "hierarchyLevel": "line",
+                    "namespace": "LineNamespace",
+                    "targetSpecFile": "C:\\Users\\johndoe\\Downloads\\targetspecs.json",
+                    "targets": [
+                        {
+                            "name": "Line6703",
+                            "displayName": "Line6703"
+                        },
+                        {
+                            "name": "Line6704",
+                            "displayName": "Line6704",
+                            "capabilities": [
+                                "azure-shampoo"
+                            ],
+                            "hierarchyLevel": "factory",
+                            "namespace": "RedmondFactoryNamespace"
+                        }
+                    ]
+                }
+            }
+        ]
+    },
+    "cmOnboarding": {
+        "schemas": [
+            {
+                "name": "CommonSchemaNew",
+                "version": "1.0.0",
+                "schemaFile": "C:\\Users\\johndoe\\Downloads\\shared-schema.yaml"
+            }
+        ],
+        "solutions": [
+            {
+                "name": "testuser-S12",
+                "description": "testuser-S1",
+                "capabilities": [
+                    "azure-soap"
+                ],
+                "version": "1.0.4",
+                "specificationFile": "C:\\Users\\johndoe\\Downloads\\specs.json",
+                "solutionTemplate": "C:\\Users\\johndoe\\Downloads\\app-config-template.yaml"
+            }
+        ]
+    }
+}

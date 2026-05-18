@@ -1,0 +1,11 @@
+rules:
+  SqlServerEndpoint:
+    type: string
+    required: true
+    editableBy:
+      - OT
+  LineHealthEndpoint:
+    type: string
+    required: true
+    editableBy:
+      - OT

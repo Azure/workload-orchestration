@@ -1,0 +1,7 @@
+TemperatureRangeMax: 85
+ErrorThreshold: 5
+HealthCheckEndpoint: http://localhost:8080/health
+EnableLocalLog: true
+AgentEndpoint: http://localhost:9090/agent
+HealthCheckEnabled: true
+ApplicationEndpoint: http://localhost:3000/api

@@ -1,0 +1,12 @@
+schema:
+  name: priceDetectorSchema
+  version: 1.0.0
+configs:
+  AppName: PriceDetector
+  TemperatureRangeMax: ${{$val(TemperatureRangeMax)}}
+  ErrorThreshold: ${{$val(ErrorThreshold)}}
+  HealthCheckEndpoint: ${{$val(HealthCheckEndpoint)}}
+  EnableLocalLog: ${{$val(EnableLocalLog)}}
+  AgentEndpoint: ${{$val(AgentEndpoint)}}
+  HealthCheckEnabled: ${{$val(HealthCheckEnabled)}}
+  ApplicationEndpoint: ${{$val(ApplicationEndpoint)}}

@@ -1,0 +1,115 @@
+{
+    "common": {
+        "resourceGroup": "",
+        "subscriptionId": "",
+        "location": "",
+        "tenantId": "",
+        "providerAppId": ""
+    },
+    "infraOnboarding": {
+        "arcLocation": "",
+        "aksClusterIdentity": "",
+        "aksClusterName": "",
+        "customLocationName": "",
+        "customLocationNamespace": "",
+        "contextResourceGroup": "",
+        "contextName": "",
+        "contextSubscriptionId": "",
+        "contextLocation": "",
+        "diagInfo": {
+            "diagnosticWorkspaceId": "",
+            "diagnosticResourceName": "default",
+            "diagnosticSettingName": "default"
+        },
+        "acrName": "",
+        "connectedRegistryName": "",
+        "connectedRegistryIp": "",
+        "connectedRegistryClientToken": "",
+        "storageSizeRequest": "",
+        "siteHierarchy": [
+            {
+                "siteName": "",
+                "parentSite": null,
+                "level": "",
+                "capabilityList": {
+                    "capabilities": [
+                        "",
+                        ""
+                    ]
+                },
+                "hierarchyLevels": {
+                    "levels": []
+                },
+                "deploymentTargets": {
+                    "capabilities": [
+                        ""
+                    ],
+                    "hierarchyLevel": "",
+                    "namespace": "",
+                    "targetSpecFile": "",
+                    "targets": [
+                        {
+                            "name": "",
+                            "displayName": "",
+                            "capabilities": [],
+                            "hierarchyLevel": "",
+                            "namespace": "",
+                            "rbac": {
+                                "role": "",
+                                "userGroup": ""
+                            }
+                        }
+                    ]
+                }
+            },
+            {
+                "siteName": "",
+                "isRGSite": true,
+                "level": ""
+            }
+        ]
+    },
+    "cmOnboarding": {
+        "schemas": [
+            {
+                "name": "",
+                "version": "",
+                "schemaFile": ""
+            },
+            {
+                "name": "",
+                "version": "",
+                "schemaFile": ""
+            }
+        ],
+        "configs": [
+            {
+                "name": "",
+                "versionName": "",
+                "configFile": ""
+            }
+        ],
+        "solutions": [
+            {
+                "name": "",
+                "description": "",
+                "capabilities": [
+                    ""
+                ],
+                "version": "",
+                "solutionTemplate": "",
+                "specificationFile": ""
+            },
+            {
+                "name": "",
+                "description": "",
+                "capabilities": [
+                    ""
+                ],
+                "version": "",
+                "solutionTemplate": "",
+                "specificationFile": ""
+            }
+        ]
+    }
+}

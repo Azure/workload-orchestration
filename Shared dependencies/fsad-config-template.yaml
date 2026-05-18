@@ -1,0 +1,15 @@
+schema:
+  name: fsad-schema
+  version: 1.0.0
+dependencies:
+  - solutionTemplateId: /subscriptions/977d15c7-6c57-444e-b9c6-6b79b5b784ab/resourceGroups/redmondGroup/providers/Microsoft.Edge/solutionTemplates/ssa-redmond
+    configsToBeInjected:
+      - from: DependencyConfig
+        to: DependencyConfigs
+configs:
+  DependencyConfig:
+    SiteName: ${{$val(SiteName)}}
+    LineName: ${{$val(LineName)}}
+    LogLevel: ${{$val(LogLevel)}}
+    TimeWindowShift: ${{$val(TimeWindowShift)}}
+    DeploymentName: ${{$val(DeploymentName)}}

@@ -1,0 +1,17 @@
+{
+      "components": [
+        {
+          "name": "${{$property(DeploymentName)}}",
+          "type": "helm.v3",
+          "properties": {
+            "chart": {
+              "repo": "contosocm.azurecr.io/helm/sharedsyncadapter",
+              "version": "0.8.0",
+              "wait": true,
+              "timeout": "5m"
+            }
+            }
+          }
+        
+      ]
+}

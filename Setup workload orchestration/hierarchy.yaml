@@ -1,0 +1,16 @@
+type: ServiceGroup
+name: sg-country
+level: country
+children:
+  - name: sg-region1
+    level: region
+    children:
+      - name: sg-factory1
+        level: factory
+      - name: sg-factory2
+        level: factory
+  - name: sg-region2
+    level: region
+    children:
+      - name: sg-factory3
+        level: factory

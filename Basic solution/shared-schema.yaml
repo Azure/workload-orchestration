@@ -1,0 +1,41 @@
+metadata:
+  name: sharedschema
+
+rules:
+  configs:
+      ErrorThreshold:
+        type: float
+        required: true
+        editableBy:
+          - OT
+      HealthCheckEndpoint:
+        type: string
+        required: false
+        editableBy:
+          - OT
+      EnableLocalLog:
+        type: boolean
+        required: true
+        editableBy:
+          - OT
+      AgentEndpoint:
+        type: string
+        required: true
+        editableBy:
+          - OT
+      HealthCheckEnabled:
+        type: boolean
+        required: false
+        editableBy:
+          - OT
+      ApplicationEndpoint:
+        type: string
+        required: true
+        editableBy:
+          - OT
+      TemperatureRangeMax:
+        type: float
+        required: true
+        editableBy:
+          - OT
+

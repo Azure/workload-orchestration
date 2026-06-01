@@ -1,0 +1,39 @@
+rules:
+  configs:
+      ErrorThreshold:
+        type: float
+        required: true
+        expression: ${{ $gt($val(ErrorThreshold), 5) }}
+        editableBy:
+          - OT
+      HealthCheckEndpoint:
+        type: string
+        required: false
+        expression: ${{ $if($val(HealthCheckEnabled), $not($empty($val(HealthCheckEndpoint))), false) }}
+        editableBy:
+          - OT
+      EnableLocalLog:
+        type: boolean
+        required: true
+        editableBy:
+          - OT
+      AgentEndpoint:
+        type: string
+        required: true
+        editableBy:
+          - OT
+      HealthCheckEnabled:
+        type: boolean
+        required: true
+        editableBy:
+          - OT
+      ApplicationEndpoint:
+        type: string
+        required: true
+        editableBy:
+          - OT
+      TemperatureRangeMax:
+        type: float
+        required: true
+        editableBy:
+          - OT

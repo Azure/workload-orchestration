@@ -1,0 +1,9 @@
+schema:
+  name: ssaSchema
+  version: 1.0.0
+configs:
+  PrometheusPort: ${{$val(PrometheusPort)}}
+  AiMqBrokerAddress: ${{$val(AiMqBrokerAddress)}}
+  AiMqBrokerPort: ${{$val(AiMqBrokerPort)}}
+  DependencyConfigs: []
+  DeploymentName: ${{$val(DeploymentName)}}

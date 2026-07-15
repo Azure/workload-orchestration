@@ -1,6 +1,26 @@
 schema:
-  name: ssaSchema
-  version: 1.0.0
+  rules:
+    configs:
+      PrometheusPort:
+        type: string
+        required: true
+        editableBy:
+          - OT
+      AiMqBrokerAddress:
+        type: string
+        required: true
+        editableBy:
+          - OT
+      AiMqBrokerPort:
+        type: int
+        required: true
+        editableBy:
+          - OT
+      DeploymentName:
+        type: string
+        required: true
+        editableBy:
+          - OT
 configs:
   PrometheusPort: ${{$val(PrometheusPort)}}
   AiMqBrokerAddress: ${{$val(AiMqBrokerAddress)}}

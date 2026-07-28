@@ -1,12 +1,30 @@
 schema:
-  name: priceDetectorSchema
-  version: 1.0.0
+  rules:
+    configs:
+        ErrorThreshold:
+          type: float
+          required: true
+          expression: ${{ $gt($val(ErrorThreshold), 5) }}
+          editableBy:
+            - OT
+        EnableLocalLog:
+          type: boolean
+          required: true
+          editableBy:
+            - OT
+        AgentEndpoint:
+          type: string
+          required: true
+          editableBy:
+            - OT
+        TemperatureRangeMax:
+          type: float
+          required: true
+          editableBy:
+            - OT
 configs:
   AppName: PriceDetector
   TemperatureRangeMax: ${{$val(TemperatureRangeMax)}}
   ErrorThreshold: ${{$val(ErrorThreshold)}}
-  HealthCheckEndpoint: ${{$val(HealthCheckEndpoint)}}
   EnableLocalLog: ${{$val(EnableLocalLog)}}
   AgentEndpoint: ${{$val(AgentEndpoint)}}
-  HealthCheckEnabled: ${{$val(HealthCheckEnabled)}}
-  ApplicationEndpoint: ${{$val(ApplicationEndpoint)}}

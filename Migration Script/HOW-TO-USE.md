@@ -10,9 +10,15 @@ deploy resources.
 
 ## Prerequisites
 
-- PowerShell 7 (`pwsh`)
-- `kubectl`, used locally for client-side YAML parsing
+- PowerShell (`pwsh`)
+- The `powershell-yaml` module, used for local YAML parsing
 - Azure CLI with Bicep support, only if you want to compile the generated file
+
+Install the YAML module once for the current user:
+
+```powershell
+Install-Module powershell-yaml -Scope CurrentUser
+```
 
 ## Quick start
 
@@ -43,6 +49,7 @@ Use `-Platform argo` for an Argo CD Application.
   [-App <application-name>] `
   [-OutputFile <bicep-path>] `
   [-SolutionVersion <version>] `
+  [-Capabilities <capability...>] `
   [-Force]
 ```
 
@@ -61,6 +68,7 @@ Use `-Platform argo` for an Argo CD Application.
 | `-App` | Inferred | Use only when `-AppFile` contains more than one HelmRelease or Application. The value must exactly match `metadata.name`. |
 | `-OutputFile` | Beside `-AppFile` | Override the generated Bicep destination. Relative paths are resolved from the current PowerShell directory. |
 | `-SolutionVersion` | `1.0.0` | Set the Solution Template version resource name. It must start with a letter or number and contain only letters, numbers, periods, underscores or hyphens. |
+| `-Capabilities` | Placeholder | One or more capability names to emit as the solution template `capabilities` array. Must be a subset of the target's capabilities. When omitted, the script emits the placeholder `['REPLACE_WITH_TARGET_CAPABILITY']` and marks the output `MIGRATION INCOMPLETE` so the value cannot be shipped unreviewed. Example: `-Capabilities web` or `-Capabilities web,data`. |
 | `-Force` | Off | Replace an existing output file. Without it, the script stops rather than overwriting the file. |
 
 ## Default output
@@ -169,38 +177,6 @@ validation skipping.
 
 Add `-Force` only when you intentionally want to replace an existing output
 file.
-
-## Migration outcomes
-
-### Complete
-
-The application is converted and the Bicep contains:
-
-- one Solution Template resource;
-- one Solution Template version;
-- one inline `helm.v3` component;
-- the chart coordinate and version; and
-- migrated Helm values under `configurations`.
-
-### Incomplete
-
-If the application uses a non-OCI chart repository, the script still creates
-compilable draft Bicep. The file contains one concise:
-
-```text
-MIGRATION INCOMPLETE
-```
-
-comment. Replace the retained source chart reference with the correct OCI chart
-coordinate before deployment.
-
-### Unsupported wholesale
-
-If the application cannot be safely converted, the script:
-
-- generates no Bicep;
-- exits with a failure code; and
-- prints one concise application-level reason.
 
 ## Compile the generated Bicep
 

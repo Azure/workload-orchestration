@@ -16,6 +16,8 @@ param(
 
     [string]$SolutionVersion = '1.0.0',
 
+    [string[]]$Capabilities,
+
     [switch]$Force
 )
 
@@ -130,6 +132,30 @@ function Test-Property {
     return $null -ne $Object.PSObject.Properties[$Name]
 }
 
+function Add-UnrecognizedFields {
+    param(
+        [AllowNull()][object]$Object,
+        [Parameter(Mandatory)][string[]]$KnownNames,
+        [string]$Prefix,
+        [Parameter(Mandatory)][AllowEmptyCollection()][System.Collections.Generic.List[string]]$Fields
+    )
+
+    if ($null -eq $Object) {
+        return
+    }
+    $names = if ($Object -is [System.Collections.IDictionary]) {
+        @($Object.Keys | ForEach-Object { [string]$_ })
+    }
+    else {
+        @($Object.PSObject.Properties.Name)
+    }
+    foreach ($name in @($names | Sort-Object -Unique)) {
+        if ($KnownNames -notcontains $name) {
+            $Fields.Add($(if ([string]::IsNullOrWhiteSpace($Prefix)) { $name } else { "$Prefix.$name" }))
+        }
+    }
+}
+
 function Assert-Command {
     param([Parameter(Mandatory)][string]$Name)
 
@@ -145,29 +171,12 @@ function ConvertFrom-YamlDocument {
         return $null
     }
 
-    Assert-Command 'kubectl'
-    $indented = (($Yaml -split "`r?`n") | ForEach-Object { "  $_" }) -join "`n"
-    $wrapper = @"
-apiVersion: v1
-kind: ConfigMap
-metadata:
-  name: gitops-wo-yaml-parser
-payload:
-$indented
-"@
-    $inputFile = [System.IO.Path]::GetTempFileName()
-    $errorFile = [System.IO.Path]::GetTempFileName()
+    Assert-Command 'ConvertFrom-Yaml'
     try {
-        [System.IO.File]::WriteAllText($inputFile, $wrapper, [System.Text.UTF8Encoding]::new($false))
-        $json = & kubectl apply --dry-run=client --validate=false -f $inputFile -o json 2> $errorFile
-        if ($LASTEXITCODE -ne 0) {
-            $detail = [System.IO.File]::ReadAllText($errorFile).Trim()
-            throw "Failed to parse YAML: $detail"
-        }
-        return (($json -join "`n") | ConvertFrom-Json -Depth 100).payload
+        return ConvertFrom-Yaml -Yaml $Yaml -Ordered
     }
-    finally {
-        Remove-Item -LiteralPath $inputFile, $errorFile -Force -ErrorAction SilentlyContinue
+    catch {
+        throw "Failed to parse YAML: $($_.Exception.Message)"
     }
 }
 
@@ -240,11 +249,12 @@ function New-NormalizedApplication {
     param(
         [Parameter(Mandatory)][string]$Name,
         [Parameter(Mandatory)][string]$ReleaseName,
-        [Parameter(Mandatory)][string]$Namespace,
+        [Parameter(Mandatory)][AllowEmptyString()][string]$Namespace,
         [Parameter(Mandatory)][string]$ChartRepository,
         [Parameter(Mandatory)][string]$ChartName,
         [Parameter(Mandatory)][string]$ChartVersion,
-        [AllowNull()][object]$Values
+        [AllowNull()][object]$Values,
+        [string[]]$UnmigratedFields = @()
     )
 
     if ($ChartVersion -notmatch '^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?(?:\+[0-9A-Za-z.-]+)?$') {
@@ -263,6 +273,7 @@ function New-NormalizedApplication {
             version = $ChartVersion
         }
         values = ConvertTo-Data $Values
+        unmigratedFields = @($UnmigratedFields | Sort-Object -Unique)
     }
 }
 
@@ -335,6 +346,57 @@ function Get-FluxDirectApplication {
         throw "Application '$ApplicationName' uses private Helm repository authentication, which is not supported."
     }
 
+    $repositoryMetadata = Get-PropertyValue $repositories[0] 'metadata'
+    $unmigratedFields = [System.Collections.Generic.List[string]]::new()
+    foreach ($field in @(
+        @{ Object = $metadata; Name = 'labels'; Path = 'metadata.labels' },
+        @{ Object = $metadata; Name = 'annotations'; Path = 'metadata.annotations' },
+        @{ Object = $spec; Name = 'interval'; Path = 'spec.interval' },
+        @{ Object = $spec; Name = 'timeout'; Path = 'spec.timeout' },
+        @{ Object = $spec; Name = 'install'; Path = 'spec.install' },
+        @{ Object = $spec; Name = 'upgrade'; Path = 'spec.upgrade' },
+        @{ Object = $spec; Name = 'releaseName'; Path = 'spec.releaseName' },
+        @{ Object = $spec; Name = 'targetNamespace'; Path = 'spec.targetNamespace' },
+        @{ Object = $repositoryMetadata; Name = 'labels'; Path = 'HelmRepository.metadata.labels' },
+        @{ Object = $repositorySpec; Name = 'interval'; Path = 'HelmRepository.spec.interval' }
+    )) {
+        if (Test-Property $field.Object $field.Name) {
+            $unmigratedFields.Add($field.Path)
+        }
+    }
+    Add-UnrecognizedFields -Object $release `
+        -KnownNames @('apiVersion', 'kind', 'metadata', 'spec') `
+        -Prefix '' -Fields $unmigratedFields
+    Add-UnrecognizedFields -Object $metadata `
+        -KnownNames @('name', 'namespace', 'labels', 'annotations') `
+        -Prefix 'metadata' -Fields $unmigratedFields
+    Add-UnrecognizedFields -Object $spec `
+        -KnownNames @(
+            'interval', 'timeout', 'releaseName', 'targetNamespace', 'install', 'upgrade',
+            'chart', 'values', 'chartRef', 'kubeConfig', 'postRenderers', 'valuesFrom',
+            'serviceAccountName', 'suspend'
+        ) `
+        -Prefix 'spec' -Fields $unmigratedFields
+    $chartWrapper = Get-PropertyValue $spec 'chart'
+    Add-UnrecognizedFields -Object $chartWrapper `
+        -KnownNames @('spec') `
+        -Prefix 'spec.chart' -Fields $unmigratedFields
+    Add-UnrecognizedFields -Object $chartSpec `
+        -KnownNames @('chart', 'version', 'sourceRef') `
+        -Prefix 'spec.chart.spec' -Fields $unmigratedFields
+    Add-UnrecognizedFields -Object $sourceRef `
+        -KnownNames @('kind', 'name', 'namespace') `
+        -Prefix 'spec.chart.spec.sourceRef' -Fields $unmigratedFields
+    Add-UnrecognizedFields -Object $repositories[0] `
+        -KnownNames @('apiVersion', 'kind', 'metadata', 'spec') `
+        -Prefix 'HelmRepository' -Fields $unmigratedFields
+    Add-UnrecognizedFields -Object $repositoryMetadata `
+        -KnownNames @('name', 'namespace', 'labels', 'annotations') `
+        -Prefix 'HelmRepository.metadata' -Fields $unmigratedFields
+    Add-UnrecognizedFields -Object $repositorySpec `
+        -KnownNames @('url', 'type', 'interval', 'secretRef') `
+        -Prefix 'HelmRepository.spec' -Fields $unmigratedFields
+
     $targetNamespace = [string](Get-PropertyValue $spec 'targetNamespace' $releaseNamespace)
     $releaseName = [string](Get-PropertyValue $spec 'releaseName')
     if ([string]::IsNullOrWhiteSpace($releaseName)) {
@@ -352,7 +414,8 @@ function Get-FluxDirectApplication {
         -ChartRepository ([string](Get-PropertyValue $repositorySpec 'url')) `
         -ChartName ([string](Get-PropertyValue $chartSpec 'chart')) `
         -ChartVersion ([string](Get-PropertyValue $chartSpec 'version')) `
-        -Values (Get-PropertyValue $spec 'values' ([ordered]@{}))
+        -Values (Get-PropertyValue $spec 'values' ([ordered]@{})) `
+        -UnmigratedFields $unmigratedFields
 }
 
 function Get-ArgoDirectApplication {
@@ -373,6 +436,7 @@ function Get-ArgoDirectApplication {
         throw "Expected one Argo Application '$ApplicationName' in the supplied file; found $($applications.Count)."
     }
 
+    $metadata = Get-PropertyValue $applications[0] 'metadata'
     $spec = Get-PropertyValue $applications[0] 'spec'
     $destination = Get-PropertyValue $spec 'destination'
     $server = [string](Get-PropertyValue $destination 'server')
@@ -438,6 +502,48 @@ function Get-ArgoDirectApplication {
         }
     }
 
+    $unmigratedFields = [System.Collections.Generic.List[string]]::new()
+    foreach ($field in @(
+        @{ Object = $metadata; Name = 'labels'; Path = 'metadata.labels' },
+        @{ Object = $metadata; Name = 'annotations'; Path = 'metadata.annotations' },
+        @{ Object = $spec; Name = 'project'; Path = 'spec.project' },
+        @{ Object = $destination; Name = 'server'; Path = 'spec.destination.server' },
+        @{ Object = $destination; Name = 'namespace'; Path = 'spec.destination.namespace' },
+        @{ Object = $spec; Name = 'syncPolicy'; Path = 'spec.syncPolicy' },
+        @{ Object = $helm; Name = 'releaseName'; Path = 'spec.sources[].helm.releaseName' }
+    )) {
+        if (Test-Property $field.Object $field.Name) {
+            $unmigratedFields.Add($field.Path)
+        }
+    }
+    $application = $applications[0]
+    Add-UnrecognizedFields -Object $application `
+        -KnownNames @('apiVersion', 'kind', 'metadata', 'spec') `
+        -Prefix '' -Fields $unmigratedFields
+    Add-UnrecognizedFields -Object $metadata `
+        -KnownNames @('name', 'namespace', 'labels', 'annotations') `
+        -Prefix 'metadata' -Fields $unmigratedFields
+    Add-UnrecognizedFields -Object $spec `
+        -KnownNames @('project', 'source', 'sources', 'destination', 'syncPolicy') `
+        -Prefix 'spec' -Fields $unmigratedFields
+    Add-UnrecognizedFields -Object $destination `
+        -KnownNames @('server', 'namespace', 'name') `
+        -Prefix 'spec.destination' -Fields $unmigratedFields
+    foreach ($source in $sources) {
+        Add-UnrecognizedFields -Object $source `
+            -KnownNames @('repoURL', 'chart', 'targetRevision', 'helm', 'ref', 'path') `
+            -Prefix 'spec.sources[]' -Fields $unmigratedFields
+        $sourceHelm = Get-PropertyValue $source 'helm'
+        if ($null -ne $sourceHelm) {
+            Add-UnrecognizedFields -Object $sourceHelm `
+                -KnownNames @(
+                    'releaseName', 'valueFiles', 'parameters', 'fileParameters', 'values',
+                    'valuesObject', 'passCredentials', 'skipCrds', 'skipSchemaValidation'
+                ) `
+                -Prefix 'spec.sources[].helm' -Fields $unmigratedFields
+        }
+    }
+
     return New-NormalizedApplication `
         -Name $ApplicationName `
         -ReleaseName $releaseName `
@@ -445,7 +551,8 @@ function Get-ArgoDirectApplication {
         -ChartRepository ([string](Get-PropertyValue $chartSource 'repoURL')) `
         -ChartName ([string](Get-PropertyValue $chartSource 'chart')) `
         -ChartVersion ([string](Get-PropertyValue $chartSource 'targetRevision')) `
-        -Values $values
+        -Values $values `
+        -UnmigratedFields $unmigratedFields
 }
 
 function ConvertTo-BicepName {
@@ -559,7 +666,52 @@ function ConvertTo-YamlLines {
 
 function Escape-BicepString {
     param([Parameter(Mandatory)][string]$Value)
-    return $Value.Replace("'", "''")
+    # Produce a safe body for a single-quoted (interpolated) Bicep string.
+    # Escape backslash first, then quote, control chars, and interpolation.
+    $escaped = $Value.Replace('\', '\\')
+    $escaped = $escaped.Replace("'", "\'")
+    $escaped = $escaped.Replace("`r", '\r')
+    $escaped = $escaped.Replace("`n", '\n')
+    $escaped = $escaped.Replace("`t", '\t')
+    $escaped = $escaped.Replace('${', '\${')
+    return $escaped
+}
+
+function ConvertTo-CommentText {
+    # Collapse newlines/control chars so source-derived text cannot break out of
+    # a generated // line comment and inject Bicep.
+    param([Parameter(Mandatory)][AllowEmptyString()][string]$Value)
+    return (($Value -replace '[\r\n\t]+', ' ') -replace '\s{2,}', ' ').Trim()
+}
+
+function Get-SecretishKeyPaths {
+    param([AllowNull()][object]$Value, [string]$Path = '')
+    $pattern = '(?i)(passw(or)?d|pwd|secret|token|api[-_]?key|access[-_]?key|private[-_]?key|client[-_]?secret|conn(ection)?[-_]?string|credential|bearer|sas(l|_token|_key)?)'
+    $found = [System.Collections.Generic.List[string]]::new()
+    if ($Value -is [System.Collections.IDictionary]) {
+        foreach ($entry in $Value.GetEnumerator()) {
+            $key = [string]$entry.Key
+            $childPath = if ($Path) { "$Path.$key" } else { $key }
+            if ($key -match $pattern) { $found.Add($childPath) }
+            foreach ($nested in @(Get-SecretishKeyPaths -Value $entry.Value -Path $childPath)) { $found.Add($nested) }
+        }
+    }
+    elseif ($Value -is [pscustomobject]) {
+        foreach ($property in @($Value.PSObject.Properties)) {
+            $key = $property.Name
+            $childPath = if ($Path) { "$Path.$key" } else { $key }
+            if ($key -match $pattern) { $found.Add($childPath) }
+            foreach ($nested in @(Get-SecretishKeyPaths -Value $property.Value -Path $childPath)) { $found.Add($nested) }
+        }
+    }
+    elseif ($Value -is [System.Collections.IEnumerable] -and $Value -isnot [string]) {
+        $index = 0
+        foreach ($item in $Value) {
+            foreach ($nested in @(Get-SecretishKeyPaths -Value $item -Path "$Path[$index]")) { $found.Add($nested) }
+            $index++
+        }
+    }
+    return $found.ToArray()
 }
 
 function Get-DisplayPath {
@@ -656,20 +808,42 @@ else {
 }
 $configuration = ConvertTo-YamlLines -Value ([ordered]@{ configs = $woValues }) -Indent 6
 $configurationYaml = $configuration -join "`n"
+if ($configurationYaml.Contains("'''")) {
+    throw "A configuration value contains a triple single-quote (''') sequence that cannot be represented in the generated Bicep configurations block. Remove or modify that value and retry."
+}
 $solutionName = ConvertTo-BicepName $effectiveApp
 $safeSolutionName = Escape-BicepString $solutionName
 $safeVersion = Escape-BicepString $SolutionVersion
 $safeRepository = Escape-BicepString ([string]$chartResolution.repository)
 $safeChartVersion = Escape-BicepString ([string](Get-PropertyValue $chart 'version'))
+$capabilitiesList = if ($Capabilities -and $Capabilities.Count -gt 0) { $Capabilities } else { @('REPLACE_WITH_TARGET_CAPABILITY') }
+$capabilitiesBicep = '[' + (($capabilitiesList | ForEach-Object { "'" + (Escape-BicepString $_) + "'" }) -join ', ') + ']'
 
 $comments = [System.Collections.Generic.List[string]]::new()
 $comments.Add('// Generated by gitopsWoMigrator.ps1.')
-$comments.Add("// Source: $Platform $($AppFile.Replace('\', '/'))")
+$comments.Add("// Source: $Platform $(ConvertTo-CommentText ($AppFile.Replace('\', '/')))")
 $comments.Add('// Review before deployment.')
+$unmigratedFields = @(Get-PropertyValue $application 'unmigratedFields' @())
+$incompleteReasons = [System.Collections.Generic.List[string]]::new()
+if ($unmigratedFields.Count -gt 0) {
+    $incompleteReasons.Add("Source fields not migrated: $($unmigratedFields -join ', ')")
+}
 if (-not $chartResolution.mapped) {
+    $incompleteReasons.Add("Chart: $($chartResolution.warning)")
+}
+if (-not $Capabilities -or $Capabilities.Count -eq 0) {
+    $incompleteReasons.Add("Capabilities: placeholder emitted. Set solutionTemplate capabilities to a subset of the target's capabilities before deployment.")
+}
+$secretKeys = @(Get-SecretishKeyPaths -Value $woValues)
+if ($secretKeys.Count -gt 0) {
+    $incompleteReasons.Add("Secrets: plaintext values were copied into the template (keys: $($secretKeys -join ', ')). Externalize these as secure references before deployment.")
+}
+if ($incompleteReasons.Count -gt 0) {
     $comments.Add('//')
     $comments.Add('// MIGRATION INCOMPLETE: Manual action is required before deployment.')
-    $comments.Add("// Reason: $($chartResolution.warning)")
+    foreach ($reason in $incompleteReasons) {
+        $comments.Add("// $(ConvertTo-CommentText $reason)")
+    }
 }
 
 $bicep = @"
@@ -684,7 +858,7 @@ resource solutionTemplate 'Microsoft.Edge/solutionTemplates@2026-03-01' = {
   location: location
   properties: {
     description: '$safeSolutionName migrated to Workload Orchestration'
-    capabilities: ['web']
+    capabilities: $capabilitiesBicep
   }
 }
 
@@ -729,7 +903,7 @@ if ((Test-Path -LiteralPath $destination) -and -not $Force) {
 }
 [System.IO.Directory]::CreateDirectory((Split-Path -Parent $destination)) | Out-Null
 [System.IO.File]::WriteAllText($destination, $bicep, [System.Text.UTF8Encoding]::new($false))
-if (-not $chartResolution.mapped) {
-    Write-Warning "Migration incomplete. Review the generated Bicep before deployment."
+if ($incompleteReasons.Count -gt 0) {
+    Write-Warning "Migration incomplete. $($incompleteReasons -join ' | ')"
 }
 Write-Host "Generated standalone Solution Template Bicep: $(Get-DisplayPath $destination)"

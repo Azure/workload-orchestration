@@ -1,6 +1,6 @@
-# How to use gitopsWoMigrator
+# How to use wo_migrator
 
-`gitopsWoMigrator.ps1` converts one direct Flux HelmRelease or one direct Argo
+`wo_migrator.ps1` converts one direct Flux HelmRelease or one direct Argo
 CD Application into one standalone Azure Workload Orchestration Solution
 Template Bicep file.
 
@@ -25,7 +25,7 @@ Install-Module powershell-yaml -Scope CurrentUser
 Run the script from PowerShell with three required parameters:
 
 ```powershell
-.\gitopsWoMigrator.ps1 `
+.\wo_migrator.ps1 `
   -Platform flux `
   -Repo .\flux `
   -AppFile podinfo.yaml
@@ -42,7 +42,7 @@ Use `-Platform argo` for an Argo CD Application.
 ## Command syntax
 
 ```powershell
-.\gitopsWoMigrator.ps1 `
+.\wo_migrator.ps1 `
   -Platform <flux|argo> `
   -Repo <local-folder> `
   -AppFile <relative-application-path> `
@@ -117,7 +117,7 @@ service-account configuration or suspended releases.
 ### Flux example
 
 ```powershell
-.\gitopsWoMigrator.ps1 `
+.\wo_migrator.ps1 `
   -Platform flux `
   -Repo .\flux `
   -AppFile podinfo.yaml
@@ -158,7 +158,7 @@ validation skipping.
 ### Argo CD example
 
 ```powershell
-.\gitopsWoMigrator.ps1 `
+.\wo_migrator.ps1 `
   -Platform argo `
   -Repo .\argo `
   -AppFile podinfo.yaml
@@ -167,7 +167,7 @@ validation skipping.
 ## Custom output and version
 
 ```powershell
-.\gitopsWoMigrator.ps1 `
+.\wo_migrator.ps1 `
   -Platform flux `
   -Repo C:\repos\customer-app `
   -AppFile apps\payments.yaml `

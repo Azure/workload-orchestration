@@ -198,7 +198,7 @@ resource cloudTarget 'Microsoft.Edge/targets@2026-05-01-preview' = {
 }
 
 // ============================================================
-// Single (merged) GHES Solution Template + single version.
+// GHES Solution Template + version.
 // specification.components has ONE armtemplate component pointing
 // at the SINGLE merged template spec (ghesSpecName/ghesSpecVersion).
 // ============================================================

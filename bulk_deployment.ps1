@@ -17,6 +17,29 @@ function DeleteFiles {
     }
 }
 
+function Assert-SafeAzArgument {
+    param (
+        [Parameter(Mandatory=$true)]
+        [string] $Name,
+        [AllowNull()]
+        [string] $Value,
+        [Parameter(Mandatory=$true)]
+        [string] $Pattern,
+        [switch] $Required
+    )
+
+    if ([string]::IsNullOrWhiteSpace($Value)) {
+        if ($Required) {
+            throw "Input field '$Name' is required."
+        }
+        return
+    }
+
+    if ($Value -cnotmatch $Pattern) {
+        throw "Input field '$Name' has an invalid format or contains characters that are not allowed in Azure CLI arguments."
+    }
+}
+
 function RunPublishOrReview {
     param(
     [string]$solutionTemplateName,
@@ -145,6 +168,20 @@ try {
     $subId = $object.subscriptionId
     $targets = $object.targets
     $skipReview = $object.skipReview
+
+    $identifierPattern = '\A[A-Za-z0-9][A-Za-z0-9._-]{0,127}\z'
+    $resourceGroupPattern = '\A(?=.{1,90}\z)[A-Za-z0-9_](?:[A-Za-z0-9._-]*[A-Za-z0-9_-])?\z'
+    $subscriptionIdPattern = '\A[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}\z'
+    $filePathPattern = '\A[A-Za-z0-9 _.:\\/+-]+\z'
+
+    Assert-SafeAzArgument -Name "solutionTemplateName" -Value $solutionTemplateName -Pattern $identifierPattern -Required
+    Assert-SafeAzArgument -Name "solutionTemplateVersion" -Value $solutionTemplateVersion -Pattern $identifierPattern -Required
+    Assert-SafeAzArgument -Name "SolutionInstanceName" -Value $solutionInstanceName -Pattern $identifierPattern
+    Assert-SafeAzArgument -Name "solutionConfiguration" -Value $solutionConfiguration -Pattern $filePathPattern
+    Assert-SafeAzArgument -Name "dependencies" -Value $dependencies -Pattern $filePathPattern
+    Assert-SafeAzArgument -Name "resourceGroup" -Value $rg -Pattern $resourceGroupPattern -Required
+    Assert-SafeAzArgument -Name "subscriptionId" -Value $subId -Pattern $subscriptionIdPattern -Required
+
     $jsonTargets = ConvertTo-Json $targets
    
     $jsonTargets | Out-File -FilePath $tempFile -Encoding UTF8 -Force

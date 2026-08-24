@@ -1,4 +1,4 @@
-# Deploy GitHub Enterprise Server (github-local) on Azure Local
+# Deploy AIO infrastructor components
 
 This folder contains everything you need to deploy a **AIO Infra components** instance
 — referred to as **AIO setup** — onto an **Arc enabled K8s cluster** cluster using Azure
@@ -15,7 +15,7 @@ The deployment provisions the complete GHES stack in **one** solution deployment
 
 | # | Resource | Purpose |
 |---|----------|---------|
-| 1 | **azure-iot-operations**  | Initilize IOT operations on K8s cluster with set of extensions |
+| 1 | **azure-iot-operations**  | Initialize IOT operations on K8s cluster with set of extensions |
 | 2| **azure-iot-instance** | Creates the connectors on Cloud to establish connection to AIO applications on K8s cluster/Target|
 
 
@@ -74,22 +74,10 @@ az account set --subscription "<your-subscription-id>"
 ### Step 1 — Update aio-setup.bicepparam with necessary values
 
 ### Step 2 — deploy aio-setup.bicep
-
-`main.bicep` references a template spec by name/version/resource group. Publish
-`ghes.bicep` **once** as that template spec. The name, version and resource group must match
-the `ghesSpecName`, `ghesSpecVersion`, `subscriptionId` and `resourceGroupName` parameters you
-use in Step 4.
-
 ```powershell
-az ts create `
-  --name "aio-infra-deployment" `
-  --version "1.0.0" `
-  --resource-group "<template-spec-resource-group>" `
-  --location "eastus2" `
-  --template-file "aio-setup.bicep"
-  --parameters "aio-setup.bicepparam"
+az deployment group create --name <name> --subscription <subid> --resource-group <rg name> --template-file aio-setup.bicep --parameters aio-setup.bicepparam
 ```
-### Step 5 — Verify
+### Step 3 — Verify
 #### 1. In the Azure portal, go to the resource group that contains your Azure IoT Operations instance or search for and select Azure 
 #### 2. IoT Operations.
 #### 3. Select the name of your Azure IoT Operations instance (per target/k8s cluster) On the Overview page of your instance, select the Resource summary tab to view the provisioning state of the resources that were deployed to your cluster.

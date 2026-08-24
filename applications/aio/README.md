@@ -11,7 +11,7 @@ the order to run them in, and a full description of every parameter.
 
 ## 1. What gets deployed
 
-The deployment provisions the complete GHES stack in **one** solution deployment:
+The deployment provisions the complete AIO infra components in **one** solution deployment:
 
 | # | Resource | Purpose |
 |---|----------|---------|

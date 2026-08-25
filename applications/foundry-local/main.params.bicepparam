@@ -1,21 +1,20 @@
 using './main.bicep'
 
 // Deploy this file into the resource group containing the Arc-connected cluster.
-param location = 'eastus2euap'
-param clusterName = 'akg-test-Cluster'
+param location = '<location>'
+param clusterName = '<arc-connected-cluster-name>'
 
-param contextId = '/subscriptions/973d15c6-6c57-447e-b9c6-6d79b5b784ab/resourceGroups/Mehoopany/providers/Microsoft.Edge/contexts/Mehoopany-Context'
+param contextId = '/subscriptions/<context-subscription-id>/resourceGroups/<context-resource-group>/providers/Microsoft.Edge/contexts/<workload-orchestration-context-name>'
 
-param capabilityName = 'bugbash-akg-App'
+param capabilityName = '<capability-name>'
 param targetName = 'foundry-local-target'
-param woCustomLocationName = 'akg-test-Location'
-param woExtensionName = 'woextension'
+param woCustomLocationName = '<workload-orchestration-custom-location-name>'
+param woExtensionName = '<workload-orchestration-extension-name>'
 
-param woReleaseNamespace = 'workloadorchestration'
-param woCustomLocationNamespace = 'cloudtestsite'
+param woCustomLocationNamespace = '<custom-location-namespace>'
 param woExtensionType = 'microsoft.workloadorchestration'
 param woReleaseTrain = 'dev'
-param woExtensionVersion = '2.1.40'
+param woExtensionVersion = '2.1.43'
 param woRedisStorageClass = 'default'
 param woRedisStorageSize = '5Gi'
 

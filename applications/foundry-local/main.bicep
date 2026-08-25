@@ -21,9 +21,6 @@ param woCustomLocationName string = 'foundry-local-wo-location'
 @description('Name of the Workload Orchestration extension installed on the Arc cluster.')
 param woExtensionName string = 'workloadorchestration-extension'
 
-@description('Namespace used by the Workload Orchestration extension.')
-param woReleaseNamespace string = 'workloadorchestration'
-
 @description('Namespace registered by the custom location.')
 param woCustomLocationNamespace string = 'wo'
 
@@ -90,12 +87,6 @@ resource certManagerExtension 'Microsoft.KubernetesConfiguration/extensions@2022
     extensionType: 'microsoft.certmanagement'
     autoUpgradeMinorVersion: true
     releaseTrain: 'stable'
-    version: '0.11.0'
-    scope: {
-      cluster: {
-        releaseNamespace: 'cert-manager'
-      }
-    }
   }
 }
 
@@ -110,11 +101,6 @@ resource workloadOrchestrationExtension 'Microsoft.KubernetesConfiguration/exten
     autoUpgradeMinorVersion: false
     releaseTrain: woReleaseTrain
     version: woExtensionVersion
-    scope: {
-      cluster: {
-        releaseNamespace: woReleaseNamespace
-      }
-    }
     configurationSettings: {
       'redis.persistentVolume.storageClass': woRedisStorageClass
       'redis.persistentVolume.size': woRedisStorageSize
@@ -171,6 +157,7 @@ resource foundryTarget 'Microsoft.Edge/targets@2026-05-01-preview' = {
   }
 }
 
+@onlyIfNotExists()
 resource inferenceTemplate 'Microsoft.Edge/solutiontemplates@2026-05-01-preview' = {
   name: 'foundry-local-inference'
   location: location
@@ -180,6 +167,7 @@ resource inferenceTemplate 'Microsoft.Edge/solutiontemplates@2026-05-01-preview'
       capabilityName
     ]
   }
+  @onlyIfNotExists()
   resource version 'versions@2026-05-01-preview' = {
     name: '1.0.0'
     properties: {
@@ -221,6 +209,7 @@ resource inferenceDeployment 'Microsoft.Edge/solutiondeployments@2026-05-01-prev
   }
 }
 
+@onlyIfNotExists()
 resource modelTemplate 'Microsoft.Edge/solutiontemplates@2026-05-01-preview' = {
   name: 'foundry-local-model'
   location: location
@@ -231,6 +220,7 @@ resource modelTemplate 'Microsoft.Edge/solutiontemplates@2026-05-01-preview' = {
     ]
   }
 
+  @onlyIfNotExists()
   resource version 'versions@2026-05-01-preview' = {
     name: '1.0.0'
     properties: {

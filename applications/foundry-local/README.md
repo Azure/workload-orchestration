@@ -106,7 +106,8 @@ the value used for `capabilityName` is declared by the context.
 
 ### Step 3 - Edit the parameters
 
-Open `main.params.bicepparam` and replace the sample environment values. At minimum, review:
+Open `main.params.bicepparam` and replace every value enclosed in `<...>` with the corresponding
+value from your Azure environment. At minimum, review:
 
 - `location`
 - `clusterName`
@@ -214,7 +215,6 @@ model.
 |-----------|----------|---------|-------------|
 | `woCustomLocationName` | No | `foundry-local-wo-location` | Name of the Workload Orchestration Custom Location. |
 | `woExtensionName` | No | `workloadorchestration-extension` | Name of the Workload Orchestration Arc extension. |
-| `woReleaseNamespace` | No | `workloadorchestration` | Kubernetes namespace used by the extension release. |
 | `woCustomLocationNamespace` | No | `wo` | Namespace registered by the Custom Location. |
 | `woExtensionType` | No | `microsoft.workloadorchestration` | Arc extension type. |
 | `woReleaseTrain` | No | `dev` | Arc extension release train. |
@@ -223,8 +223,7 @@ model.
 | `woRedisStorageSize` | No | `5Gi` | Persistent volume size used by Workload Orchestration Redis. |
 
 The cert-manager extension settings are defined directly in `main.bicep`: extension type
-`microsoft.certmanagement`, stable release train, version `0.11.0`, and namespace
-`cert-manager`.
+`microsoft.certmanagement`, stable release train, and automatic minor-version upgrades.
 
 ### 5.3 Foundry inference operator
 
@@ -276,6 +275,8 @@ The cert-manager extension settings are defined directly in `main.bicep`: extens
 ## 7. Redeployment
 
 Workload Orchestration solution-template versions should be treated as immutable.
+The template uses `@onlyIfNotExists()` for solution templates and their versions so an unchanged
+redeployment reuses existing resources instead of attempting to update them.
 
 When changing chart configuration or component specifications:
 

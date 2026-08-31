@@ -10,6 +10,14 @@ Workload Orchestration enables the deployment and management of applications acr
 - **Automation scripts** — PowerShell, Python, and shell scripts to automate deployment workflows.
 - **Reference solutions** — End-to-end examples demonstrating best practices.
 
+## Application examples
+
+| Application | Description |
+|-------------|-------------|
+| [Azure IoT Operations](./aio/) | Deploys Azure IoT Operations infrastructure components to an Arc-enabled Kubernetes cluster. |
+| [Foundry Local](./foundry-local/) | Deploys a Foundry Local inference operator and AI model to an Arc-connected Kubernetes cluster. |
+| [GitHub Enterprise Server](./github-enterprise-local/) | Deploys GitHub Enterprise Server infrastructure using Workload Orchestration. |
+
 ## Structure
 
 Each application should have its own subfolder, for example:

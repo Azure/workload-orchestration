@@ -259,6 +259,7 @@ resource mongoDbSolutionTemplate 'Microsoft.Edge/solutionTemplates@2026-03-01' =
     parent: mongoDbSolutionTemplate
     name: '1.0.0'
     properties: {
+      configurations: {}
       specification: {
         components: [
           {

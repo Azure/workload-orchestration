@@ -5,7 +5,8 @@ This folder contains everything needed to deploy **Foundry Local** to an Arc-con
 (`Microsoft.Edge`) and a single Bicep template.
 
 The deployment installs the Workload Orchestration cluster dependencies, creates a Kubernetes
-target, and deploys both the Foundry inference operator and a CPU-based Phi-4 model.
+target, and deploys both the Foundry inference operator and a configurable CPU or GPU model.
+The supplied parameter file uses a CPU-based Phi-4 model as the example.
 
 ---
 
@@ -54,7 +55,8 @@ Before you start, make sure you have:
   template is deployed.
 - An existing Workload Orchestration **context** and the full resource ID of its
   `Microsoft.Edge/contexts` resource.
-- A capability declared by that context. The `capabilityName` parameter must match it exactly.
+- One or more capabilities declared by that context. Every value in `capabilityNames` must match
+  a context capability exactly.
 - Permissions to manage:
   - `Microsoft.KubernetesConfiguration/extensions`
   - `Microsoft.ExtendedLocation/customLocations`
@@ -90,7 +92,7 @@ az connectedk8s show `
   --output tsv
 ```
 
-The cluster name returned by this command must match `clusterName`, and this resource group must
+The cluster name returned by this command must match `connectClusterName`, and this resource group must
 be used for the deployment in Step 4.
 
 ### Step 2 - Confirm the Workload Orchestration context and capability
@@ -102,7 +104,7 @@ az resource show `
 ```
 
 Set `contextId` to this resource ID. Confirm with the Workload Orchestration service owner that
-the value used for `capabilityName` is declared by the context.
+every value used in `capabilityNames` is declared by the context.
 
 ### Step 3 - Edit the parameters
 
@@ -110,17 +112,17 @@ Open `main.params.bicepparam` and replace every value enclosed in `<...>` with t
 value from your Azure environment. At minimum, review:
 
 - `location`
-- `clusterName`
+- `connectClusterName`
 - `contextId`
-- `capabilityName`
-- `woCustomLocationName`
-- `woExtensionName`
-- `woExtensionType`
-- `woExtensionVersion`
-- `woCustomLocationNamespace`
-- `woRedisStorageClass`
-- `woRedisStorageSize`
-- `inferenceChartRepository` and `inferenceChartVersion`
+- `capabilityNames`
+- `workloadOrchestrationCustomLocationName`
+- `workloadOrchestrationExtensionName`
+- `workloadOrchestrationExtensionType`
+- `workloadOrchestrationExtensionVersion`
+- `workloadOrchestrationCustomLocationNamespace`
+- `workloadOrchestrationRedisStorageClass`
+- `workloadOrchestrationRedisStorageSize`
+- `inferenceoperatorChartRepository` and `inferenceoperatorChartVersion`
 - `modelChartRepository` and `modelChartVersion`
 - All `model*` settings
 
@@ -204,23 +206,23 @@ model.
 | Parameter | Required | Default | Description |
 |-----------|----------|---------|-------------|
 | `location` | Yes | - | Azure region for the Arc cluster and Workload Orchestration resources. |
-| `clusterName` | Yes | - | Name of the Arc-connected AKS cluster in the deployment resource group. |
+| `connectClusterName` | Yes | - | Name of the Arc-connected AKS cluster in the deployment resource group. |
 | `contextId` | Yes | - | Full resource ID of the existing `Microsoft.Edge/contexts` resource. |
-| `capabilityName` | No | `foundry-local` | Capability shared by the target and both solution templates. Must exist in the context. |
+| `capabilityNames` | No | `['foundry-local']` | Capabilities shared by the target and both solution templates. Each capability must exist in the context. |
 | `targetName` | No | `foundry-local-target` | Name of the Workload Orchestration Kubernetes target. |
 
 ### 5.2 Cluster extensions and Custom Location
 
 | Parameter | Required | Default | Description |
 |-----------|----------|---------|-------------|
-| `woCustomLocationName` | No | `foundry-local-wo-location` | Name of the Workload Orchestration Custom Location. |
-| `woExtensionName` | No | `workloadorchestration-extension` | Name of the Workload Orchestration Arc extension. |
-| `woCustomLocationNamespace` | No | `wo` | Namespace registered by the Custom Location. |
-| `woExtensionType` | No | `microsoft.workloadorchestration` | Arc extension type. |
-| `woReleaseTrain` | No | `dev` | Arc extension release train. |
-| `woExtensionVersion` | No | `2.1.40` | Exact Workload Orchestration extension version. Minor-version auto-upgrade is disabled. |
-| `woRedisStorageClass` | No | `default` | Storage class used by the Workload Orchestration Redis persistent volume. |
-| `woRedisStorageSize` | No | `5Gi` | Persistent volume size used by Workload Orchestration Redis. |
+| `workloadOrchestrationCustomLocationName` | No | `foundry-local-workload-orchestration-location` | Name of the Workload Orchestration Custom Location. |
+| `workloadOrchestrationExtensionName` | No | `workloadorchestration-extension` | Name of the Workload Orchestration Arc extension. |
+| `workloadOrchestrationCustomLocationNamespace` | No | `workloadorchestration` | Namespace registered by the Custom Location. |
+| `workloadOrchestrationExtensionType` | No | `microsoft.workloadorchestration` | Arc extension type. |
+| `workloadOrchestrationReleaseTrain` | No | `stable` | Arc extension release train. |
+| `workloadOrchestrationExtensionVersion` | No | `2.1.43` | Exact Workload Orchestration extension version. Minor-version auto-upgrade is disabled. |
+| `workloadOrchestrationRedisStorageClass` | No | `default` | Storage class used by the Workload Orchestration Redis persistent volume. |
+| `workloadOrchestrationRedisStorageSize` | No | `5Gi` | Persistent volume size used by Workload Orchestration Redis. |
 
 The cert-manager extension settings are defined directly in `main.bicep`: extension type
 `microsoft.certmanagement`, stable release train, and automatic minor-version upgrades.
@@ -229,8 +231,8 @@ The cert-manager extension settings are defined directly in `main.bicep`: extens
 
 | Parameter | Required | Default | Description |
 |-----------|----------|---------|-------------|
-| `inferenceChartRepository` | No | `mcr.microsoft.com/foundrylocalonazurelocal/helmcharts/helm/inference-operator` | OCI repository for the Foundry inference operator Helm chart. |
-| `inferenceChartVersion` | No | `0.0.1-prp.3` | Inference operator chart version. |
+| `inferenceoperatorChartRepository` | No | `mcr.microsoft.com/foundrylocalonazurelocal/helmcharts/helm/inference-operator` | OCI repository for the Foundry inference operator Helm chart. |
+| `inferenceoperatorChartVersion` | No | `0.0.1-prp.3` | Inference operator chart version. |
 
 ### 5.4 AI model
 
@@ -241,7 +243,8 @@ The cert-manager extension settings are defined directly in `main.bicep`: extens
 | `modelName` | No | `phi-4-cpu` | Model deployment name passed to the chart. |
 | `modelDisplayName` | No | `Phi-4 CPU` | Human-readable model name. |
 | `modelCatalogName` | No | `Phi-4-generic-cpu` | Model catalog identifier. |
-| `modelVersion` | No | `1` | Model version passed to the chart. |
+| `modelVersion` | No | `2` | Model version passed to the chart. |
+| `modelCompute` | No | `cpu` | Model compute type. Set to `gpu` when using a GPU-capable model and cluster. |
 | `modelReplicas` | No | `1` | Number of model replicas. Must be at least 1. |
 | `modelCpu` | No | `4` | CPU request and limit for each model replica. The sample parameter file overrides this to `2`. |
 | `modelMemory` | No | `8Gi` | Memory request and limit for each model replica. |
@@ -255,7 +258,7 @@ The cert-manager extension settings are defined directly in `main.bicep`: extens
 - The inference operator is deployed first as the `foundry` Helm release.
 - The model is deployed second as the `aifoundry` Helm release.
 - Both Helm deployments wait for readiness and use a seven-minute timeout.
-- The model workload type is `generative` and its compute type is `cpu`.
+- The model workload type is `generative`; `modelCompute` selects CPU or GPU execution.
 - Model CPU and memory values are used for both Kubernetes requests and limits.
 
 ### 6.1 Resource API versions
@@ -296,12 +299,12 @@ Do not commit registry credentials, access tokens, or other secrets to parameter
 ## 8. Troubleshooting
 
 - **Arc cluster not found:** deploy to the resource group containing the
-  `Microsoft.Kubernetes/connectedClusters` resource and verify `clusterName`.
-- **Capability validation fails:** ensure `capabilityName` exactly matches a capability declared
+  `Microsoft.Kubernetes/connectedClusters` resource and verify `connectClusterName`.
+- **Capability validation fails:** ensure every value in `capabilityNames` exactly matches a capability declared
   by the context referenced by `contextId`.
 - **Extension installation fails:** verify the configured extension type, release train, version,
   preview access, and cluster connectivity.
-- **Redis remains pending:** verify `woRedisStorageClass` exists and supports dynamic
+- **Redis remains pending:** verify `workloadOrchestrationRedisStorageClass` exists and supports dynamic
   provisioning, and that sufficient storage is available.
 - **Helm chart pull fails:** confirm the chart repository/version and ensure the cluster identity
   has access to any private registry.

@@ -1,104 +1,160 @@
 param targets object[]
-param location string
 param opEnablementSolutionTemplate object
 param opInstanceSolutionTemplate object
 param targetConfigTemplate string
 param contextId string
+param capability string
 
 
 // ============================================================
 // Cloud Target - for ARM template deployments (no custom location)
 // ============================================================
+
+
+param addresses_SiteAddress_name string = 'SiteAddress'
+
+@onlyIfNotExists()
+resource addresses_SiteAddress_name_resource 'Microsoft.EdgeOrder/addresses@2024-02-01' = {
+  name: addresses_SiteAddress_name
+  location: 'eastus'
+  properties: {
+    addressClassification: 'Shipping'
+    shippingAddress: {
+      streetAddress1: '1'
+      streetAddress2: 'First Lane'
+      city: 'CloudTestSite'
+      country: 'US'
+      companyName: 'Contoso'
+      addressType: 'None'
+    }
+    contactDetails: {
+      contactName: 'Persona'
+      phone: '0000000000'
+      emailList: [
+        'noreply@contoso.com'
+      ]
+    }
+  }
+}
+
+@onlyIfNotExists()
+resource site 'Microsoft.Edge/sites@2024-02-01-preview' = {
+  name: 'aiosite'
+  properties: {
+    addressResourceId: addresses_SiteAddress_name_resource.id
+    description: 'aio site'
+    displayName: 'aio Site'
+  }
+}
+
+var splt = split(contextId, '/')
+var ctxRg = splt[4]
+var ctxName = splt[8]
+module siteReference './Modules/sitereference.bicep' = {
+  name: 'aio-site-reference'
+  scope: resourceGroup(ctxRg)
+  params: {
+    siteId: site.id
+    contextName: ctxName
+  }
+}
+
 
 @onlyIfNotExists()
 resource aioOpSpec 'Microsoft.Resources/templateSpecs@2022-02-01' = {
   name: 'aio-op-spec'
-  location: location
+  location: resourceGroup().location
   properties: {
     description: 'Template spec'
   }
+}
 
-   @onlyIfNotExists()
-  resource aioOpSpecVersion 'versions@2022-02-01' = {
+@onlyIfNotExists()
+  resource aioOpSpecVersion 'Microsoft.Resources/templateSpecs/versions@2022-02-01' = {
     name: '1.0'
-    location: location
+    parent: aioOpSpec
+    location: resourceGroup().location
     properties: {
       mainTemplate: loadJsonContent('./AioOnboardingTemplates/azure-iot-operations-enablement.json')
     }
   }
-}
 
 @onlyIfNotExists()
 resource aioOpInstanceSpec 'Microsoft.Resources/templateSpecs@2022-02-01' = {
   name: 'aio-op-instance-spec'
-  location: location
+  location: resourceGroup().location
   properties: {
     description: 'Template spec'
   }
+}
 
-   @onlyIfNotExists()
-  resource aioOpInstanceSpecVersion 'versions@2022-02-01' = {
+@onlyIfNotExists()
+  resource aioOpInstanceSpecVersion 'Microsoft.Resources/templateSpecs/versions@2022-02-01' = {
+    parent: aioOpInstanceSpec
     name: '1.0'
-    location: location
+    location: resourceGroup().location
     properties: {
       mainTemplate: loadJsonContent('./AioOnboardingTemplates/azure-iot-operations-instance.json')
     }
   }
-}
 
 // ============================================================
 // Cloud Target - for ARM template deployments (no custom location)
 // ============================================================
-resource cloudTargets 'Microsoft.Edge/targets@2026-05-01-preview' = [ for target in targets: {
+module cloudTargets './Modules/target.bicep' = [for (target, i) in targets: {
   name: target.name
-  location: location
-  properties: {
-    capabilities: [
-      target.capability
-    ]
+  scope: resourceGroup(target.resourceGroupName)
+  dependsOn: [
+    siteReference
+  ]
+  params: {
     contextId: contextId
-    description: 'Cloud target for ARM template infrastructure deployment'
-    displayName: 'Cloud Infrastructure Target'
-    hierarchyLevel: 'line'
+    capability: capability
+    name: target.name
+    location: target.location
   }
-}]
+}
+]
 
 @onlyIfNotExists()
 resource configTemplate 'Microsoft.Edge/configTemplates@2026-05-01-preview' = {
   name: 'cloud-target-config'
-  location: location
+  location: resourceGroup().location
   dependsOn:[cloudTargets]
   properties: {
    description: 'Configuration template for cloud target'
   }
+}
 
-  @onlyIfNotExists()
-  resource configTemplateVersion 'versions@2026-05-01-preview' = {
-    name: '1.0.0'
-    properties: {
-      configurations: targetConfigTemplate
-    }
-  }
-
-  resource configTemplateMetadata 'configTemplateMetadatas@2026-05-01-preview' = {
+resource configTemplateMetadata 'Microsoft.Edge/configTemplates/configTemplateMetadatas@2026-05-01-preview' = {
+    parent: configTemplate
     name: 'config-metadata'
     properties: {
       templateUniqueIdentifier: configTemplate.properties.uniqueIdentifier
       linkedHierarchies: [
         {
           level: 'line'
-          hierarchyIds: [for (target, i) in targets: cloudTargets[i].id]
+          hierarchyIds: [for (target, i) in targets: cloudTargets[i].outputs.id]
         }
       ]
       contextId: contextId
     }
-  }
 }
 
+
+@onlyIfNotExists()
+  resource configTemplateVersion 'Microsoft.Edge/configTemplates/versions@2026-05-01-preview' = {
+    parent: configTemplate
+    name: '1.0.0'
+    properties: {
+      configurations: targetConfigTemplate
+    }
+  }
 module dynamicConfigModule './Modules/cloud-target-dc.bicep' = [for (target, i) in targets: {
   name: 'cloud-target-dynamic-config${i}'
   dependsOn: [
-    configTemplate
+    configTemplateVersion
+    configTemplateMetadata
   ]
   params: {
     configResourceName: cloudTargets[i].name
@@ -111,14 +167,11 @@ module dynamicConfigModule './Modules/cloud-target-dc.bicep' = [for (target, i) 
   @onlyIfNotExists()
 resource opEnablement 'Microsoft.Edge/solutionTemplates@2026-05-01-preview' = {
   name: opEnablementSolutionTemplate.name
-  location: location
-  dependsOn: [
-    configTemplate
-  ]
+  location: resourceGroup().location
   properties: {
     description: 'Infrastructure deployment - Connected Cluster + WO Extension + Custom Location'
     capabilities: [
-      opEnablementSolutionTemplate.capability
+      capability
     ]
   }
 
@@ -141,7 +194,7 @@ resource opEnablement 'Microsoft.Edge/solutionTemplates@2026-05-01-preview' = {
             properties: {
               template: {
                 name: aioOpSpec.name
-                version: aioOpSpec::aioOpSpecVersion.name
+                version: aioOpSpecVersion.name
               }
             }
           }
@@ -152,14 +205,14 @@ resource opEnablement 'Microsoft.Edge/solutionTemplates@2026-05-01-preview' = {
 @onlyIfNotExists()
 resource opInstance 'Microsoft.Edge/solutionTemplates@2026-05-01-preview' = {
   name: opInstanceSolutionTemplate.name
-  location: location
+  location: resourceGroup().location
   dependsOn: [
     configTemplate
   ]
   properties: {
     description: 'Infrastructure deployment - Connected Cluster + WO Extension + Custom Location'
     capabilities: [
-      opInstanceSolutionTemplate.capability
+      capability
     ]
   }
 
@@ -182,7 +235,7 @@ resource opInstance 'Microsoft.Edge/solutionTemplates@2026-05-01-preview' = {
             properties: {
               template: {
                 name: aioOpInstanceSpec.name
-                version: aioOpInstanceSpec::aioOpInstanceSpecVersion.name
+                version: aioOpInstanceSpecVersion.name
               }
             }
           }
@@ -194,9 +247,8 @@ resource opInstance 'Microsoft.Edge/solutionTemplates@2026-05-01-preview' = {
 
 resource opEnablementDeployment 'Microsoft.Edge/solutionDeployments@2026-05-01-preview' = {
   name: opEnablementSolutionTemplate.name // deployment name
-  location: location
+  location: resourceGroup().location
   dependsOn: [
-    cloudTargets
     v1_0_0_op
     v1_0_0_instance
     dynamicConfigModule
@@ -208,7 +260,7 @@ resource opEnablementDeployment 'Microsoft.Edge/solutionDeployments@2026-05-01-p
     }
     targetProperties: {
     targetIds: [
-      for (target, i) in targets: cloudTargets[i].id
+      for (target, i) in targets: cloudTargets[i].outputs.id
     ]
   }
 }
@@ -216,7 +268,7 @@ resource opEnablementDeployment 'Microsoft.Edge/solutionDeployments@2026-05-01-p
 
 resource opInstanceDeployment 'Microsoft.Edge/solutionDeployments@2026-05-01-preview' = {
   name: opInstanceSolutionTemplate.name // deployment name
-  location: location
+  location: resourceGroup().location
   dependsOn: [
     opEnablementDeployment
   ]
@@ -227,7 +279,7 @@ resource opInstanceDeployment 'Microsoft.Edge/solutionDeployments@2026-05-01-pre
     }
     targetProperties: {
     targetIds: [
-      for (target, i) in targets: cloudTargets[i].id
+      for (target, i) in targets: cloudTargets[i].outputs.id
     ]
   }
 }

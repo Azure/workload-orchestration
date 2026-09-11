@@ -31,6 +31,8 @@ Deployment** (`aio-setup.bicep`)
 | `aio-setup.bicep` | **Entry point.** Deploys the Workload Orchestration Cloud Target, Solution Template (+version) and Solution Deployment. This is what you deploy. |
 | `aio-setup.bicepparam` | Parameter file for `aio-setup.bicep` |
 | `Modules/cloud-target-dc.bicep` | The is the module to set the target level configurations. This would internally gets referred in aio-setup.bicep. |
+| `Modules/target.bicep` | The is the module to create target in a resource group defined in target. |
+| `Modules/sitereferences.bicep` | The is the module to create site reference under the given context|
 | `AioOnboardingTemplates` | Contains the ARM template published by AIO team to deploy aio components. Templates are downloaded from public github https://github.com/Azure/azure-iot-operations/tree/main/release hosted by AIO teams
 
 ---

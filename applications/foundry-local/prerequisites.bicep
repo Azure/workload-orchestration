@@ -36,7 +36,7 @@ param workloadOrchestrationExtensionType string = 'microsoft.workloadorchestrati
 param workloadOrchestrationReleaseTrain string = 'stable'
 
 @description('Workload Orchestration extension version.')
-param workloadOrchestrationExtensionVersion string = '2.1.43'
+param workloadOrchestrationExtensionVersion string = '2.1.37'
 
 @description('Storage class used by Workload Orchestration Redis.')
 param workloadOrchestrationRedisStorageClass string = 'default'

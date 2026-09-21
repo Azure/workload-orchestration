@@ -17,6 +17,6 @@ param workloadOrchestrationExtensionName = '<workload-orchestration-extension-na
 param workloadOrchestrationCustomLocationNamespace = 'workloadorchestration'
 param workloadOrchestrationExtensionType = 'microsoft.workloadorchestration'
 param workloadOrchestrationReleaseTrain = 'stable'
-param workloadOrchestrationExtensionVersion = '2.1.43'
+param workloadOrchestrationExtensionVersion = '2.1.37'
 param workloadOrchestrationRedisStorageClass = 'default'
 param workloadOrchestrationRedisStorageSize = '5Gi'

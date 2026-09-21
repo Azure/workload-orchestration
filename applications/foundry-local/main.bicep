@@ -3,43 +3,13 @@ targetScope = 'resourceGroup'
 @description('Azure region for the Arc cluster and Workload Orchestration resources.')
 param location string
 
-@description('Name of the Arc-connected AKS cluster in the deployment resource group.')
-param connectClusterName string
-
-@description('Workload Orchestration context resource ID.')
-param contextId string
-
 @description('Capabilities shared by the target and solution templates.')
 param capabilityNames string[] = [
   'foundry-local'
 ]
 
-@description('Workload Orchestration target name.')
+@description('Name of the existing Workload Orchestration target.')
 param targetName string = 'foundry-local-target'
-
-@description('Workload Orchestration custom location name.')
-param workloadOrchestrationCustomLocationName string = 'foundry-local-workload-orchestration-location'
-
-@description('Name of the Workload Orchestration extension installed on the Arc cluster.')
-param workloadOrchestrationExtensionName string = 'workloadorchestration-extension'
-
-@description('Namespace registered by the custom location.')
-param workloadOrchestrationCustomLocationNamespace string = 'workloadorchestration'
-
-@description('Workload Orchestration extension type.')
-param workloadOrchestrationExtensionType string = 'microsoft.workloadorchestration'
-
-@description('Workload Orchestration release train.')
-param workloadOrchestrationReleaseTrain string = 'stable'
-
-@description('Workload Orchestration extension version.')
-param workloadOrchestrationExtensionVersion string = '2.1.43'
-
-@description('Storage class used by Workload Orchestration Redis.')
-param workloadOrchestrationRedisStorageClass string = 'default'
-
-@description('Persistent volume size used by Workload Orchestration Redis.')
-param workloadOrchestrationRedisStorageSize string = '5Gi'
 
 @description('Foundry inference operator chart repository.')
 param inferenceoperatorChartRepository string = 'mcr.microsoft.com/foundrylocalonazurelocal/helmcharts/helm/inference-operator'
@@ -47,11 +17,29 @@ param inferenceoperatorChartRepository string = 'mcr.microsoft.com/foundrylocalo
 @description('Foundry inference operator chart version.')
 param inferenceoperatorChartVersion string = '0.0.1-prp.3'
 
+@description('Foundry inference operator solution template name.')
+param inferenceTemplateName string = 'foundry-local-inference'
+
+@description('Foundry inference operator solution template version.')
+param inferenceTemplateVersion string = '1.0.0'
+
+@description('Foundry inference operator solution deployment name.')
+param inferenceDeploymentName string = 'foundry-inference'
+
 @description('AI model chart repository.')
 param modelChartRepository string = 'foundrypoc.azurecr.io/helm/ai-model'
 
 @description('AI model chart version.')
 param modelChartVersion string = '0.1.0'
+
+@description('Foundry model solution template name.')
+param modelTemplateName string = 'foundry-local-model'
+
+@description('Foundry model solution template version.')
+param modelTemplateVersion string = '1.0.0'
+
+@description('Foundry model solution deployment name.')
+param modelDeploymentName string = 'foundry-model'
 
 @description('Model deployment name.')
 param modelName string = 'phi-4-cpu'
@@ -65,7 +53,7 @@ param modelCatalogName string = 'Phi-4-generic-cpu'
 @description('Model version.')
 param modelVersion string = '1'
 
-@description('Compute type used by the model deployment.')
+@description('Compute type used by the model deployment. Set to gpu when using a GPU-capable model and cluster.')
 @allowed([
   'cpu'
   'gpu'
@@ -77,100 +65,29 @@ param modelCompute string = 'cpu'
 param modelReplicas int = 1
 
 @description('CPU request and limit for each model replica, including GPU models.')
-param modelCpu string = '4'
+param modelCpu string = '8'
 
 @description('Memory request and limit for each model replica.')
-param modelMemory string = '8Gi'
+param modelMemory string = '24Gi'
 
 @description('Enable the model endpoint.')
 param modelEndpointEnabled bool = false
 
-resource connectedCluster 'Microsoft.Kubernetes/connectedClusters@2025-12-01-preview' existing = {
-  name: connectClusterName
-}
-resource certManagerExtension 'Microsoft.KubernetesConfiguration/extensions@2022-03-01' = {
-  name: 'cert-manager-extension'
-  scope: connectedCluster
-  properties: {
-    extensionType: 'microsoft.certmanagement'
-    autoUpgradeMinorVersion: true
-    releaseTrain: 'stable'
-  }
-}
-resource workloadOrchestrationExtension 'Microsoft.KubernetesConfiguration/extensions@2022-03-01' = {
-  name: workloadOrchestrationExtensionName
-  scope: connectedCluster
-  dependsOn: [
-    certManagerExtension
-  ]
-  properties: {
-    extensionType: workloadOrchestrationExtensionType
-    autoUpgradeMinorVersion: false
-    releaseTrain: workloadOrchestrationReleaseTrain
-    version: workloadOrchestrationExtensionVersion
-    configurationSettings: {
-      'redis.persistentVolume.storageClass': workloadOrchestrationRedisStorageClass
-      'redis.persistentVolume.size': workloadOrchestrationRedisStorageSize
-    }
-  }
-}
-
-resource workloadOrchestrationCustomLocation 'Microsoft.ExtendedLocation/customLocations@2021-03-15-preview' = {
-  name: workloadOrchestrationCustomLocationName
-  location: location
-  properties: {
-    displayName: 'Foundry Local Workload Orchestration'
-    hostResourceId: connectedCluster.id
-    namespace: workloadOrchestrationCustomLocationNamespace
-    clusterExtensionIds: [
-      workloadOrchestrationExtension.id
-    ]
-  }
-}
-
-resource foundryTarget 'Microsoft.Edge/targets@2026-05-01-preview' = {
+resource foundryTarget 'Microsoft.Edge/targets@2026-05-01-preview' existing = {
   name: targetName
-  location: location
-  extendedLocation: {
-    name: workloadOrchestrationCustomLocation.id
-    type: 'CustomLocation'
-  }
-  properties: {
-    capabilities: capabilityNames
-    contextId: contextId
-    description: 'Kubernetes target for Foundry Local'
-    displayName: 'Foundry Local Target'
-    hierarchyLevel: 'line'
-    solutionScope: 'foundry-local'
-    targetSpecification: {
-      components: []
-      scope: 'default'
-      topologies: [
-        {
-          bindings: [
-            {
-              config: {
-                inCluster: 'true'
-              }
-              provider: 'providers.target.helm'
-              role: 'helm.v3'
-            }
-          ]
-        }
-      ]
-    }
-  }
 }
 
+@onlyIfNotExists()
 resource inferenceTemplate 'Microsoft.Edge/solutiontemplates@2026-05-01-preview' = {
-  name: 'foundry-local-inference'
+  name: inferenceTemplateName
   location: location
   properties: {
     description: 'Foundry Local inference operator'
     capabilities: capabilityNames
   }
+  @onlyIfNotExists()
   resource version 'versions@2026-05-01-preview' = {
-    name: '1.0.0'
+    name: inferenceTemplateVersion
     properties: {
       configurations: '{}'
       specification: {
@@ -184,7 +101,7 @@ resource inferenceTemplate 'Microsoft.Edge/solutiontemplates@2026-05-01-preview'
                 repo: inferenceoperatorChartRepository
                 version: inferenceoperatorChartVersion
                 wait: true
-                timeout: '7m'
+                timeout: '15m'
               }
             }
           }
@@ -195,7 +112,7 @@ resource inferenceTemplate 'Microsoft.Edge/solutiontemplates@2026-05-01-preview'
 }
 
 resource inferenceDeployment 'Microsoft.Edge/solutiondeployments@2026-05-01-preview' = {
-  name: 'foundry-inference'
+  name: inferenceDeploymentName
   location: location
   properties: {
     solutionTemplateProperties: {
@@ -210,18 +127,17 @@ resource inferenceDeployment 'Microsoft.Edge/solutiondeployments@2026-05-01-prev
   }
 }
 
-
+@onlyIfNotExists()
 resource modelTemplate 'Microsoft.Edge/solutiontemplates@2026-05-01-preview' = {
-  name: 'foundry-local-model'
+  name: modelTemplateName
   location: location
   properties: {
     description: 'Foundry Local AI model'
     capabilities: capabilityNames
   }
-
-
+  @onlyIfNotExists()
   resource version 'versions@2026-05-01-preview' = {
-    name: '1.0.0'
+    name: modelTemplateVersion
     properties: {
       configurations: string({
         configs: {
@@ -260,7 +176,7 @@ resource modelTemplate 'Microsoft.Edge/solutiontemplates@2026-05-01-preview' = {
                 repo: modelChartRepository
                 version: modelChartVersion
                 wait: true
-                timeout: '7m'
+                timeout: '20m'
               }
             }
           }
@@ -271,7 +187,7 @@ resource modelTemplate 'Microsoft.Edge/solutiontemplates@2026-05-01-preview' = {
 }
 
 resource modelDeployment 'Microsoft.Edge/solutiondeployments@2026-05-01-preview' = {
-  name: 'foundry-model'
+  name: modelDeploymentName
   location: location
   dependsOn: [
     inferenceDeployment
@@ -289,7 +205,5 @@ resource modelDeployment 'Microsoft.Edge/solutiondeployments@2026-05-01-preview'
   }
 }
 
-output targetId string = foundryTarget.id
-output customLocationId string = workloadOrchestrationCustomLocation.id
 output inferenceDeploymentId string = inferenceDeployment.id
 output modelDeploymentId string = modelDeployment.id

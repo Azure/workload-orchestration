@@ -6,14 +6,14 @@
     "_generator": {
       "name": "bicep",
       "version": "0.48.1.52935",
-      "templateHash": "2703359696379775953"
+      "templateHash": "18219660110299951327"
     }
   },
   "parameters": {
     "clusterName": {
       "type": "string",
       "metadata": {
-        "description": "Azure Local cluster name; unlocks auto-resolution of networking and infrastructure values."
+        "description": "Azure Local cluster name"
       }
     },
     "LocalSharePath": {
@@ -30,7 +30,6 @@
     },
     "LogicalNetworkName": {
       "type": "string",
-      "defaultValue": "ghes-lnet",
       "metadata": {
         "description": "Name of the logical network resource."
       }
@@ -62,40 +61,39 @@
     "AdminPassword": {
       "type": "securestring",
       "metadata": {
-        "description": "Administrator password stored in Key Vault. Workload Orchestration receives only a secret reference."
+        "description": "Administrator password."
       }
     },
     "CPU": {
       "type": "int",
-      "defaultValue": 16,
+      "allowedValues": [4, 8, 16, 32],
       "minValue": 4,
       "maxValue": 32,
       "metadata": {
-        "description": "Number of virtual processors assigned to the VM. Enter a value from 4 to 32 vCPUs."
+        "description": "Number of virtual processors assigned to the VM. Input values: 4, 8, 16 or 32 vCPUs."
       }
     },
     "Memory": {
       "type": "int",
-      "defaultValue": 32768,
+      "allowedValues": [32768, 49152, 65536, 131072],
       "minValue": 32768,
       "maxValue": 131072,
       "metadata": {
-        "description": "Memory assigned to the VM in MB. Enter a value from 32768 MB (32 GB) to 131072 MB (128 GB)."
+        "description": "Memory assigned to the VM in MB. Input values: 32768 MB(32GB), 49152 MB(48GB), 65536 MB(64GB) or 131072 MB(128GB)."
       }
     },
     "NumberDataDisks": {
       "type": "int",
-      "defaultValue": 1,
-      "minValue": 0,
+      "minValue": 1,
       "metadata": {
         "description": "Number of data disks to create and attach."
       }
     },
     "DiskSizeGB": {
       "type": "int",
-      "defaultValue": 500,
+      "minValue": 500,
       "metadata": {
-        "description": "Size of each data disk in GB."
+        "description": "Size of each data disk in GB. Minimum value is 500"
       }
     },
     "KeyVaultName": {
@@ -109,20 +107,20 @@
     "ManagementConsolePassword": {
       "type": "securestring",
       "metadata": {
-        "description": "GHES management-console password stored in Key Vault. Workload Orchestration receives only a secret reference."
+        "description": "Management-console password."
       }
     },
     "LicenseBase64": {
       "type": "securestring",
       "metadata": {
-        "description": "Base64-encoded GHES license file. Stored across two Key Vault secrets because a real .ghl base64 (~27 KB) exceeds Key Vault's 25,600-char secret value limit."
+        "description": "Provide Base64-encoded GHES license key."
       }
     },
     "existingContextId": {
       "type": "string",
       "defaultValue": "",
       "metadata": {
-        "description": "Existing tenant Workload Orchestration context resource ID. Leave empty only when the tenant has no context."
+        "description": "Leave blank if tenant has no context."
       }
     }
   },

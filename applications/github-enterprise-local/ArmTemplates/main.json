@@ -6,7 +6,7 @@
     "_generator": {
       "name": "bicep",
       "version": "0.48.1.52935",
-      "templateHash": "3013910862060937721"
+      "templateHash": "6432029617650148697"
     }
   },
   "parameters": {
@@ -120,10 +120,10 @@
         "description": "Management-console password."
       }
     },
-    "LicenseBase64": {
+    "LicenseKey": {
       "type": "securestring",
       "metadata": {
-        "description": "Provide Base64-encoded GHES license key."
+        "description": "Provide GHES license key."
       }
     },
     "existingContextId": {
@@ -1002,10 +1002,11 @@
         }
       }
     },
-    "licenseLength": "[length(parameters('LicenseBase64'))]",
+    "licenseBase64": "[base64(parameters('LicenseKey'))]",
+    "licenseLength": "[length(variables('licenseBase64'))]",
     "licenseHalf": "[div(variables('licenseLength'), 2)]",
-    "licensePart1": "[substring(parameters('LicenseBase64'), 0, variables('licenseHalf'))]",
-    "licensePart2": "[substring(parameters('LicenseBase64'), variables('licenseHalf'), sub(variables('licenseLength'), variables('licenseHalf')))]",
+    "licensePart1": "[substring(variables('licenseBase64'), 0, variables('licenseHalf'))]",
+    "licensePart2": "[substring(variables('licenseBase64'), variables('licenseHalf'), sub(variables('licenseLength'), variables('licenseHalf')))]",
     "createContext": "[empty(parameters('existingContextId'))]",
     "contextIdParts": "[split(if(variables('createContext'), resourceId('Microsoft.Edge/contexts', variables('contextName')), parameters('existingContextId')), '/')]",
     "existingContextSubscriptionId": "[variables('contextIdParts')[2]]",

@@ -1,0 +1,57 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentParameters.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "existingContextId": {
+      "value": ""
+    },
+    "clusterName": {
+      "value": ""
+    },
+    "LocalSharePath": {
+      "value": ""
+    },
+    "StoragePathId": {
+      "value": ""
+    },
+    "LogicalNetworkName": {
+      "value": ""
+    },
+    "StartIp": {
+      "value": ""
+    },
+    "EndIp": {
+      "value": ""
+    },
+    "VmName": {
+      "value": ""
+    },
+    "AdminUsername": {
+      "value": ""
+    },
+    "AdminPassword": {
+      "value": ""
+    },
+    "CPU": {
+      "value": 16
+    },
+    "Memory": {
+      "value": 32768
+    },
+    "NumberDataDisks": {
+      "value": 1
+    },
+    "DiskSizeGB": {
+      "value": 500
+    },
+    "KeyVaultName": {
+      "value": ""
+    },
+    "ManagementConsolePassword": {
+      "value": ""
+    },
+    "LicenseBase64": {
+      "value": ""
+    }
+  }
+}

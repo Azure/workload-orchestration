@@ -6,7 +6,7 @@
     "_generator": {
       "name": "bicep",
       "version": "0.48.1.52935",
-      "templateHash": "18219660110299951327"
+      "templateHash": "3013910862060937721"
     }
   },
   "parameters": {
@@ -66,7 +66,12 @@
     },
     "CPU": {
       "type": "int",
-      "allowedValues": [4, 8, 16, 32],
+      "allowedValues": [
+        4,
+        8,
+        16,
+        32
+      ],
       "minValue": 4,
       "maxValue": 32,
       "metadata": {
@@ -75,7 +80,12 @@
     },
     "Memory": {
       "type": "int",
-      "allowedValues": [32768, 49152, 65536, 131072],
+      "allowedValues": [
+        32768,
+        49152,
+        65536,
+        131072
+      ],
       "minValue": 32768,
       "maxValue": 131072,
       "metadata": {
@@ -1213,9 +1223,10 @@
         "contextId": "[variables('effectiveContextId')]",
         "description": "Cloud target for ARM template infrastructure deployment",
         "displayName": "Cloud Infrastructure Target",
-        "hierarchyLevel": "[variables('contextHierarchyName')]"
+        "hierarchyLevel": "[last(if(empty(if(variables('createContext'), createArray(), reference('existingContext').hierarchies)), createArray(createObject('name', variables('contextHierarchyName'), 'description', 'Hierarchy used by the GHES cloud target.')), if(variables('createContext'), createArray(), reference('existingContext').hierarchies))).name]"
       },
       "dependsOn": [
+        "existingContext",
         "newContext",
         "updateExistingContext"
       ]
@@ -1272,7 +1283,7 @@
           "location": "[if(variables('createContext'), createObject('value', variables('Location')), createObject('value', reference('existingContext', '2026-03-01', 'full').location))]",
           "tags": "[if(variables('createContext'), createObject('value', createObject()), createObject('value', coalesce(reference('existingContext', '2026-03-01', 'full').tags, createObject())))]",
           "capabilities": "[if(contains(map(if(variables('createContext'), createArray(), reference('existingContext').capabilities), lambda('capability', lambdaVariables('capability').name)), variables('infraCapabilityName')), if(variables('createContext'), createObject('value', createArray()), createObject('value', reference('existingContext').capabilities)), createObject('value', concat(if(variables('createContext'), createArray(), reference('existingContext').capabilities), createArray(createObject('name', variables('infraCapabilityName'), 'description', 'Capability used by the GHES deployment.', 'state', 'active')))))]",
-          "hierarchies": "[if(variables('createContext'), createObject('value', createArray()), createObject('value', reference('existingContext').hierarchies))]"
+          "hierarchies": "[if(empty(if(variables('createContext'), createArray(), reference('existingContext').hierarchies)), createObject('value', createArray(createObject('name', variables('contextHierarchyName'), 'description', 'Hierarchy used by the GHES cloud target.'))), if(variables('createContext'), createObject('value', createArray()), createObject('value', reference('existingContext').hierarchies)))]"
         },
         "template": {
           "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",

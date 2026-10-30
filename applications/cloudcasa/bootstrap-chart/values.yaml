@@ -1,0 +1,31 @@
+namespaces:
+  server: cloudcasa-server
+  mongo: cloudcasa-mongo
+
+secretStore:
+  tenantId: ""
+  keyVaultName: ""
+  clientId: ""
+  serviceAccountName: cloudcasa-secret-sync
+  secretProviderClassName: cloudcasa-key-vault
+  registryDockerConfigSecretName: cloudcasa-registry-dockerconfig
+  licenseKeyVaultSecretName: cloudcasa-license
+  localAdminUsernameSecretName: cloudcasa-local-admin-username
+  localAdminEmailSecretName: cloudcasa-local-admin-email
+  localAdminPasswordSecretName: cloudcasa-local-admin-password
+
+kubernetesSecrets:
+  registry: myregistrykey
+  license: cc-user-license-key
+  localAuthentication: cloudcasa-local-auth
+
+localAuthenticationEnabled: true
+localAuthenticationRevision: r1
+
+readiness:
+  name: cloudcasa-secret-readiness
+  image: registry.k8s.io/pause:3.9
+
+issuer:
+  enabled: true
+  name: cloudcasa-selfsigned-issuer

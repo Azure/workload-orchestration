@@ -1,0 +1,6 @@
+apiVersion: v2
+name: cloudcasa-bootstrap
+description: CloudCasa namespace and Azure Key Vault secret synchronization bootstrap
+type: application
+version: 0.2.4
+appVersion: "1.0"

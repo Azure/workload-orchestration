@@ -83,7 +83,7 @@
       "minValue": 32768,
       "maxValue": 131072,
       "metadata": {
-        "description": "Memory assigned to the VM in MB. Supported range: 32768-131072 MB (32-128 GB)."
+        "description": "Memory assigned to the VM in MB. Supported range: 32768-131072 MB."
       }
     },
     "NumberDataDisks": {

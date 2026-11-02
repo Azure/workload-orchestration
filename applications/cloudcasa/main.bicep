@@ -85,7 +85,7 @@ param acrName string = ''
 @description('OCI repository containing the CloudCasa bootstrap chart.')
 param bootstrapChartRepository string = 'oci://${acrName}.azurecr.io/helm/cloudcasa-bootstrap'
 
-@description('CloudCasa bootstrap chart version.')]
+@description('CloudCasa bootstrap chart version.')
 param bootstrapChartVersion string = '0.2.4'
 
 @description('Immutable bootstrap solution-template version.')

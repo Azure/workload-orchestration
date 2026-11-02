@@ -1,0 +1,1363 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+  "languageVersion": "2.0",
+  "contentVersion": "1.0.0.0",
+  "metadata": {
+    "_generator": {
+      "name": "bicep",
+      "version": "0.48.1.52935",
+      "templateHash": "2703359696379775953"
+    }
+  },
+  "parameters": {
+    "clusterName": {
+      "type": "string",
+      "metadata": {
+        "description": "Azure Local cluster name; unlocks auto-resolution of networking and infrastructure values."
+      }
+    },
+    "LocalSharePath": {
+      "type": "string",
+      "metadata": {
+        "description": "Required cluster-local path to the source GHES VHDX."
+      }
+    },
+    "StoragePathId": {
+      "type": "string",
+      "metadata": {
+        "description": "Resource ID of the Azure Local storage container used by the image and VM configuration."
+      }
+    },
+    "LogicalNetworkName": {
+      "type": "string",
+      "defaultValue": "ghes-lnet",
+      "metadata": {
+        "description": "Name of the logical network resource."
+      }
+    },
+    "StartIp": {
+      "type": "string",
+      "metadata": {
+        "description": "Static IP assigned to GHES and the start of the workload IP pool."
+      }
+    },
+    "EndIp": {
+      "type": "string",
+      "metadata": {
+        "description": "End of the workload IP pool."
+      }
+    },
+    "VmName": {
+      "type": "string",
+      "metadata": {
+        "description": "Required name of the GHES virtual machine and Arc machine."
+      }
+    },
+    "AdminUsername": {
+      "type": "string",
+      "metadata": {
+        "description": "Administrator username for the GHES VM."
+      }
+    },
+    "AdminPassword": {
+      "type": "securestring",
+      "metadata": {
+        "description": "Administrator password stored in Key Vault. Workload Orchestration receives only a secret reference."
+      }
+    },
+    "CPU": {
+      "type": "int",
+      "defaultValue": 16,
+      "minValue": 4,
+      "maxValue": 32,
+      "metadata": {
+        "description": "Number of virtual processors assigned to the VM. Enter a value from 4 to 32 vCPUs."
+      }
+    },
+    "Memory": {
+      "type": "int",
+      "defaultValue": 32768,
+      "minValue": 32768,
+      "maxValue": 131072,
+      "metadata": {
+        "description": "Memory assigned to the VM in MB. Enter a value from 32768 MB (32 GB) to 131072 MB (128 GB)."
+      }
+    },
+    "NumberDataDisks": {
+      "type": "int",
+      "defaultValue": 1,
+      "minValue": 0,
+      "metadata": {
+        "description": "Number of data disks to create and attach."
+      }
+    },
+    "DiskSizeGB": {
+      "type": "int",
+      "defaultValue": 500,
+      "metadata": {
+        "description": "Size of each data disk in GB."
+      }
+    },
+    "KeyVaultName": {
+      "type": "string",
+      "minLength": 3,
+      "maxLength": 24,
+      "metadata": {
+        "description": "Globally unique Key Vault name (3-24 characters, alphanumeric and dashes)."
+      }
+    },
+    "ManagementConsolePassword": {
+      "type": "securestring",
+      "metadata": {
+        "description": "GHES management-console password stored in Key Vault. Workload Orchestration receives only a secret reference."
+      }
+    },
+    "LicenseBase64": {
+      "type": "securestring",
+      "metadata": {
+        "description": "Base64-encoded GHES license file. Stored across two Key Vault secrets because a real .ghl base64 (~27 KB) exceeds Key Vault's 25,600-char secret value limit."
+      }
+    },
+    "existingContextId": {
+      "type": "string",
+      "defaultValue": "",
+      "metadata": {
+        "description": "Existing tenant Workload Orchestration context resource ID. Leave empty only when the tenant has no context."
+      }
+    }
+  },
+  "variables": {
+    "Location": "eastus",
+    "cloudTargetName": "cloud-target",
+    "contextName": "defaultContext",
+    "contextHierarchyName": "line",
+    "infraCapabilityName": "ghes-infrastructure",
+    "ghesSolutionTemplateName": "ghes-solution-template",
+    "ghesSolutionTemplateVersionName": "1.0.0",
+    "ghesSpecName": "ghesspec",
+    "ghesSpecVersion": "1.0.0",
+    "CustomLocationId": "",
+    "VmImageName": "ghes-image",
+    "CreateImage": true,
+    "ExistingImageResourceId": "",
+    "IpAllocationMethod": "Static",
+    "AddressPrefix": "",
+    "Vlan": 0,
+    "VmSwitchName": "",
+    "DnsServers": [],
+    "DefaultGateway": "",
+    "VmNamePrefix": "ghes",
+    "TenantId": "[subscription().tenantId]",
+    "KeyVaultSkuName": "standard",
+    "EnableRbacAuthorization": true,
+    "SoftDeleteRetentionInDays": 7,
+    "ManagementConsolePasswordSecretName": "ghes-mgmt-console-password",
+    "AdminPasswordSecretName": "ghes-admin-password",
+    "GithubHostName": "",
+    "GithubHostLabel": "githubenterpriselocal",
+    "LicensePart1SecretName": "ghl-license-part1",
+    "LicensePart2SecretName": "ghl-license-part2",
+    "SubdomainIsolation": true,
+    "SignupEnabled": false,
+    "PublicPages": false,
+    "ManagePort": 8443,
+    "ApplyTimeoutMinutes": 180,
+    "ReadyTimeoutMinutes": 30,
+    "SkipApply": false,
+    "AsyncExecution": true,
+    "RunCommandName": "ghes-postconfig",
+    "ghesTemplate": {
+      "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+      "contentVersion": "1.0.0.0",
+      "metadata": {
+        "_generator": {
+          "name": "bicep",
+          "version": "0.48.1.52935",
+          "templateHash": "12638164160614974244"
+        }
+      },
+      "parameters": {
+        "clusterName": {
+          "type": "string",
+          "metadata": {
+            "description": "Azure Local cluster name; its deploymentSettings/default supplies domain/gateway/DNS/subnet/switch, and its custom location is derived by convention."
+          }
+        },
+        "ImageName": {
+          "type": "string",
+          "defaultValue": "ghes-image",
+          "metadata": {
+            "description": "Name for the VM image."
+          }
+        },
+        "CustomLocationId": {
+          "type": "string",
+          "defaultValue": "",
+          "metadata": {
+            "description": "OVERRIDE: Resource ID of the custom location for Azure Local. Blank => derived by convention <clusterName>-customlocation."
+          }
+        },
+        "LocalSharePath": {
+          "type": "string",
+          "defaultValue": "",
+          "metadata": {
+            "description": "Local file share path for the source image (VHDX). Required only when CreateImage=true."
+          }
+        },
+        "StoragePathId": {
+          "type": "string",
+          "metadata": {
+            "description": "Resource ID of the storage path (container) where the image is stored."
+          }
+        },
+        "CreateImage": {
+          "type": "bool",
+          "defaultValue": true,
+          "metadata": {
+            "description": "Create the gallery image (true) or reference an existing one (false). Set false on redeploys against an existing image."
+          }
+        },
+        "ExistingImageResourceId": {
+          "type": "string",
+          "defaultValue": "",
+          "metadata": {
+            "description": "When CreateImage=false: Resource ID of an existing gallery image. Blank => the image named <ImageName> in this resource group."
+          }
+        },
+        "LogicalNetworkName": {
+          "type": "string",
+          "defaultValue": "ghes-lnet",
+          "metadata": {
+            "description": "Name of the logical network resource."
+          }
+        },
+        "IpAllocationMethod": {
+          "type": "string",
+          "defaultValue": "Static",
+          "metadata": {
+            "description": "IP allocation method for the subnet (e.g. Static)."
+          }
+        },
+        "AddressPrefix": {
+          "type": "string",
+          "defaultValue": "",
+          "metadata": {
+            "description": "OVERRIDE: CIDR address prefix for the subnet (e.g. 10.0.0.0/24). Blank => derived from deploymentSettings subnetMask + gateway (octet-aligned masks /8,/16,/24). REQUIRED for non-octet-aligned masks."
+          }
+        },
+        "Vlan": {
+          "type": "int",
+          "defaultValue": 0,
+          "minValue": 0,
+          "maxValue": 4094,
+          "metadata": {
+            "description": "VLAN ID for the subnet (0-4094). Use 0 for untagged."
+          }
+        },
+        "Location": {
+          "type": "string",
+          "defaultValue": "[[resourceGroup().location]",
+          "metadata": {
+            "description": "Azure region/location for the deployment metadata."
+          }
+        },
+        "VmSwitchName": {
+          "type": "string",
+          "defaultValue": "",
+          "metadata": {
+            "description": "OVERRIDE: Name of the Hyper-V virtual switch. Blank => derived from deploymentSettings host-network intent (ConvergedSwitch(<intent>))."
+          }
+        },
+        "StartIp": {
+          "type": "string",
+          "metadata": {
+            "description": "Static IP for the GHES VM; also the start of the workload IP pool (NOT in deploymentSettings)."
+          }
+        },
+        "EndIp": {
+          "type": "string",
+          "metadata": {
+            "description": "End of the workload IP pool (NOT in deploymentSettings)."
+          }
+        },
+        "DnsServers": {
+          "type": "array",
+          "defaultValue": [],
+          "metadata": {
+            "description": "OVERRIDE: One or more DNS server IP addresses. Empty array => from deploymentSettings."
+          }
+        },
+        "DefaultGateway": {
+          "type": "string",
+          "defaultValue": "",
+          "metadata": {
+            "description": "OVERRIDE: Default gateway IP address for the subnet. Blank => from deploymentSettings."
+          }
+        },
+        "VmName": {
+          "type": "string",
+          "defaultValue": "",
+          "metadata": {
+            "description": "OVERRIDE: Name of the virtual machine / Arc machine to create. Blank => <VmNamePrefix>-1."
+          }
+        },
+        "VmNamePrefix": {
+          "type": "string",
+          "defaultValue": "ghes",
+          "metadata": {
+            "description": "Hostname prefix used when VmName is blank."
+          }
+        },
+        "KeyVaultId": {
+          "type": "string",
+          "metadata": {
+            "description": "Resource ID of the Key Vault containing the GHES secrets."
+          }
+        },
+        "AdminUsername": {
+          "type": "string",
+          "metadata": {
+            "description": "Administrator username for the VM."
+          }
+        },
+        "AdminPasswordKeyName": {
+          "type": "string",
+          "metadata": {
+            "description": "Name of the secret in the Key Vault containing the administrator password for the VM."
+          }
+        },
+        "CPU": {
+          "type": "int",
+          "defaultValue": 16,
+          "minValue": 4,
+          "maxValue": 32,
+          "metadata": {
+            "description": "Number of virtual processors to assign to the VM."
+          }
+        },
+        "Memory": {
+          "type": "int",
+          "defaultValue": 32768,
+          "minValue": 32768,
+          "maxValue": 131072,
+          "metadata": {
+            "description": "Memory to assign to the VM, in MB."
+          }
+        },
+        "NumberDataDisks": {
+          "type": "int",
+          "defaultValue": 1,
+          "minValue": 0,
+          "metadata": {
+            "description": "Number of data disks to create and attach."
+          }
+        },
+        "DiskSizeGB": {
+          "type": "int",
+          "defaultValue": 500,
+          "metadata": {
+            "description": "Size of each data disk in GB."
+          }
+        },
+        "ManagementConsolePasswordKeyName": {
+          "type": "string",
+          "metadata": {
+            "description": "Name of the secret in the Key Vault containing the management console password for the VM."
+          }
+        },
+        "GithubHostName": {
+          "type": "string",
+          "defaultValue": "",
+          "metadata": {
+            "description": "OVERRIDE: full GHES hostname (FQDN). Blank => <GithubHostLabel>.<domainFqdn-from-deploymentSettings>."
+          }
+        },
+        "GithubHostLabel": {
+          "type": "string",
+          "defaultValue": "githubenterpriselocal",
+          "metadata": {
+            "description": "Hostname label prepended to the domain FQDN when GithubHostName is blank."
+          }
+        },
+        "LicenseBase64Part1KeyName": {
+          "type": "string",
+          "metadata": {
+            "description": "Name of the secret in the Key Vault containing the first half of the base64 of the GHES .ghl license file."
+          }
+        },
+        "LicenseBase64Part2KeyName": {
+          "type": "string",
+          "metadata": {
+            "description": "Name of the secret in the Key Vault containing the second half of the base64 of the GHES .ghl license file."
+          }
+        },
+        "SubdomainIsolation": {
+          "type": "bool",
+          "defaultValue": true,
+          "metadata": {
+            "description": "Enable subdomain isolation."
+          }
+        },
+        "SignupEnabled": {
+          "type": "bool",
+          "defaultValue": false,
+          "metadata": {
+            "description": "Allow built-in signups (kept off for AD/LDAP-backed instances)."
+          }
+        },
+        "PublicPages": {
+          "type": "bool",
+          "defaultValue": false,
+          "metadata": {
+            "description": "Enable public GitHub Pages."
+          }
+        },
+        "ManagePort": {
+          "type": "int",
+          "defaultValue": 8443,
+          "metadata": {
+            "description": "Manage API port on the appliance."
+          }
+        },
+        "ApplyTimeoutMinutes": {
+          "type": "int",
+          "defaultValue": 120,
+          "minValue": 10,
+          "maxValue": 1440,
+          "metadata": {
+            "description": "Cap (minutes) on the on-box ghe-config-apply."
+          }
+        },
+        "ReadyTimeoutMinutes": {
+          "type": "int",
+          "defaultValue": 30,
+          "minValue": 5,
+          "maxValue": 240,
+          "metadata": {
+            "description": "Minutes to wait for the Manage API + init-triggered apply to settle before staging settings."
+          }
+        },
+        "SkipApply": {
+          "type": "bool",
+          "defaultValue": false,
+          "metadata": {
+            "description": "Stage settings only; skip ghe-config-apply (useful for a dry run)."
+          }
+        },
+        "AsyncExecution": {
+          "type": "bool",
+          "defaultValue": false,
+          "metadata": {
+            "description": "Run the config-apply asynchronously (deployment returns immediately). Default false so the deployment waits for completion."
+          }
+        },
+        "RunCommandName": {
+          "type": "string",
+          "defaultValue": "ghes-postconfig",
+          "metadata": {
+            "description": "Name of the Run Command resource created on the appliance."
+          }
+        }
+      },
+      "variables": {
+        "$fxv#0": "#!/usr/bin/env bash\nset -uo pipefail\nGHES_HOSTNAME=\"${GHES_HOSTNAME:-}\"\nGHES_MGMT_PASSWORD=\"${GHES_MGMT_PASSWORD:-}\"\nGHES_LICENSE_B64_PART1=\"${GHES_LICENSE_B64_PART1:-}\"\nGHES_LICENSE_B64_PART2=\"${GHES_LICENSE_B64_PART2:-}\"\nGHES_LICENSE_B64=\"${GHES_LICENSE_B64_PART1}${GHES_LICENSE_B64_PART2}\"\nGHES_SUBDOMAIN_ISOLATION=\"${GHES_SUBDOMAIN_ISOLATION:-true}\"\nGHES_SIGNUP_ENABLED=\"${GHES_SIGNUP_ENABLED:-false}\"\nGHES_PUBLIC_PAGES=\"${GHES_PUBLIC_PAGES:-false}\"\nGHES_MANAGE_PORT=\"${GHES_MANAGE_PORT:-8443}\"\nGHES_APPLY_TIMEOUT_MIN=\"${GHES_APPLY_TIMEOUT_MIN:-120}\"\nGHES_READY_TIMEOUT_MIN=\"${GHES_READY_TIMEOUT_MIN:-30}\"\nGHES_SKIP_APPLY=\"${GHES_SKIP_APPLY:-false}\"\nGHES_VERIFY=\"${GHES_VERIFY:-true}\"\nGHES_VERIFY_STRICT=\"${GHES_VERIFY_STRICT:-false}\"\nLIC_FILE=\"$(mktemp /tmp/ghes-license.XXXXXX.ghl)\"\nPW_FILE=\"$(mktemp /tmp/ghes-pw.XXXXXX)\"\nINIT_OUT=\"$(mktemp /tmp/ghes-init.XXXXXX.out)\"\nSETTINGS_OUT=\"$(mktemp /tmp/ghes-settings.XXXXXX.out)\"\nlog()  { printf '%s [post-config] %s\\n' \"$(date -u +%Y-%m-%dT%H:%M:%SZ)\" \"$*\"; }\ndie()  { log \"ERROR: $*\"; cleanup; exit 1; }\ncleanup() { rm -f \"$LIC_FILE\" \"$PW_FILE\" \"$INIT_OUT\" \"$SETTINGS_OUT\" 2>/dev/null || true; }\ntrap cleanup EXIT\nlc() { printf '%s' \"$1\" | tr '[:upper:]' '[:lower:]'; }\n[[ \"${EUID:-$(id -u)}\" -eq 0 ]] || die \"must run as root (Arc Linux Run Command runs as root by default).\"\ncommand -v curl >/dev/null 2>&1 || die \"curl not found on the appliance.\"\ncommand -v ghe-config-apply >/dev/null 2>&1 || die \"ghe-config-apply not found - this does not look like a GHES appliance.\"\n[[ -n \"$GHES_HOSTNAME\" ]]      || die \"GHES_HOSTNAME is required.\"\n[[ -n \"$GHES_MGMT_PASSWORD\" ]] || die \"GHES_MGMT_PASSWORD is required (protected parameter).\"\n[[ -n \"$GHES_LICENSE_B64\" ]]   || die \"GHES_LICENSE_B64 is required (protected parameter).\"\nSUBDOM=\"$(lc \"$GHES_SUBDOMAIN_ISOLATION\")\"; [[ \"$SUBDOM\" == \"true\"   || \"$SUBDOM\" == \"false\" ]]   || SUBDOM=\"true\"\nSIGNUP=\"$(lc \"$GHES_SIGNUP_ENABLED\")\";      [[ \"$SIGNUP\" == \"true\"   || \"$SIGNUP\" == \"false\" ]]   || SIGNUP=\"false\"\nPUBPAGES=\"$(lc \"$GHES_PUBLIC_PAGES\")\";      [[ \"$PUBPAGES\" == \"true\" || \"$PUBPAGES\" == \"false\" ]] || PUBPAGES=\"false\"\nPORT=\"$GHES_MANAGE_PORT\"\nBASE=\"https://127.0.0.1:${PORT}\"\nlog \"hostname=${GHES_HOSTNAME} port=${PORT} subdomain_isolation=${SUBDOM} signup_enabled=${SIGNUP} public_pages=${PUBPAGES}\"\nprintf '%s' \"$GHES_LICENSE_B64\" | tr -d '[:space:]' | base64 -d > \"$LIC_FILE\" 2>/dev/null \\\n    || die \"failed to base64-decode GHES_LICENSE_B64.\"\n[[ -s \"$LIC_FILE\" ]] || die \"decoded license file is empty.\"\nchmod 600 \"$LIC_FILE\"\nprintf '%s' \"$GHES_MGMT_PASSWORD\" > \"$PW_FILE\"\nchmod 600 \"$PW_FILE\"\nauth_config() {\n    local esc=${GHES_MGMT_PASSWORD//\\\\/\\\\\\\\}\n    esc=${esc//\\\"/\\\\\\\"}\n    printf 'user = \"api_key:%s\"\\n' \"$esc\"\n}\nmanage_api_code() {\n    auth_config | curl -K - -k -sS -o /dev/null -w '%{http_code}' --connect-timeout 10 --max-time 30 \\\n        \"${BASE}/manage/v1/config/settings\" 2>/dev/null || echo 000\n}\napply_in_progress() { pgrep -f 'ghe-config-apply' >/dev/null 2>&1; }\ninit_ghes() {\n    local code\n    log \"initializing via ${BASE}/manage/v1/config/init\"\n    code=$(curl -k -sS -o \"$INIT_OUT\" -w '%{http_code}' --connect-timeout 15 --max-time 120 \\\n        -X POST -F \"license=@${LIC_FILE}\" -F \"password=<${PW_FILE}\" \\\n        \"${BASE}/manage/v1/config/init\" 2>/dev/null || echo 000)\n    case \"$code\" in\n        202) log \"init accepted (HTTP 202).\"; return 0 ;;\n        400) if grep -qiE 'password[[:space:]]+already[[:space:]]+set' \"$INIT_OUT\" 2>/dev/null; then\n                 log \"instance already initialized (password already set) - continuing.\"; return 0\n             fi ;;\n    esac\n    log \"manage init returned HTTP ${code}; trying legacy /setup/api/start.\"\n    code=$(curl -k -sS -o \"$INIT_OUT\" -w '%{http_code}' --connect-timeout 15 --max-time 120 \\\n        -X POST -F \"license=@${LIC_FILE}\" -F \"password=<${PW_FILE}\" \\\n        \"${BASE}/setup/api/start\" 2>/dev/null || echo 000)\n    case \"$code\" in\n        200|201|202) log \"legacy init accepted (HTTP ${code}).\"; return 0 ;;\n        400) if grep -qiE 'password[[:space:]]+already[[:space:]]+set' \"$INIT_OUT\" 2>/dev/null; then\n                 log \"instance already initialized - continuing.\"; return 0\n             fi ;;\n    esac\n    log \"init response body (first 300 chars): $(head -c 300 \"$INIT_OUT\" 2>/dev/null)\"\n    return 1\n}\nwait_ready() {\n    local deadline code\n    deadline=$(( $(date +%s) + GHES_READY_TIMEOUT_MIN * 60 ))\n    log \"waiting up to ${GHES_READY_TIMEOUT_MIN}m for Manage API + initial apply to settle.\"\n    while (( $(date +%s) < deadline )); do\n        code=$(manage_api_code)\n        if [[ \"$code\" == \"200\" ]] && ! apply_in_progress; then\n            log \"Manage API ready (HTTP 200) and no apply in progress.\"\n            return 0\n        fi\n        log \"not ready yet (manage_api=${code}, apply_running=$(apply_in_progress && echo yes || echo no)); retrying in 30s.\"\n        sleep 30\n    done\n    return 1\n}\nstage_settings() {\n    local body code\n    body=$(printf '{\"github_hostname\":\"%s\",\"subdomain_isolation\":%s,\"signup_enabled\":%s,\"public_pages\":%s}' \\\n        \"$GHES_HOSTNAME\" \"$SUBDOM\" \"$SIGNUP\" \"$PUBPAGES\")\n    log \"staging settings via PUT ${BASE}/manage/v1/config/settings\"\n    code=$(auth_config | curl -K - -k -sS -o \"$SETTINGS_OUT\" -w '%{http_code}' --connect-timeout 15 --max-time 120 \\\n        -H 'Content-Type: application/json' \\\n        -X PUT --data \"$body\" \"${BASE}/manage/v1/config/settings\" 2>/dev/null || echo 000)\n    if [[ \"$code\" =~ ^2 ]]; then\n        log \"settings staged (HTTP ${code}).\"\n        return 0\n    fi\n    log \"settings response body (first 300 chars): $(head -c 300 \"$SETTINGS_OUT\" 2>/dev/null)\"\n    die \"settings PUT failed (HTTP ${code}).\"\n}\napply_config() {\n    local logf rc\n    logf=\"/data/user/common/ghe-config-apply.$(date -u +%Y%m%d%H%M%S).log\"\n    log \"running ghe-config-apply (timeout ${GHES_APPLY_TIMEOUT_MIN}m); log: ${logf}\"\n    if command -v timeout >/dev/null 2>&1; then\n        timeout \"${GHES_APPLY_TIMEOUT_MIN}m\" ghe-config-apply >\"$logf\" 2>&1 && rc=0 || rc=$?\n    else\n        ghe-config-apply >\"$logf\" 2>&1 && rc=0 || rc=$?\n    fi\n    log \"ghe-config-apply exit code: ${rc}\"\n    log \"--- last 20 lines of apply log ---\"\n    tail -n 20 \"$logf\" 2>/dev/null || true\n    log \"----------------------------------\"\n    return \"$rc\"\n}\nverify_endpoints() {\n    [[ \"$(lc \"$GHES_VERIFY\")\" == \"true\" ]] || { log \"endpoint self-verify skipped (GHES_VERIFY=false).\"; return 0; }\n    local failures=0\n    check_code() {\n        local desc=\"$1\" url=\"$2\" expected=\"$3\"; shift 3\n        local code\n        code=$(curl -k -sS -o /dev/null -w '%{http_code}' --connect-timeout 10 --max-time 30 \"$@\" \"$url\" 2>/dev/null || echo 000)\n        if [[ \"$code\" =~ ^($expected)$ ]]; then\n            log \"verify PASS: ${desc} (HTTP ${code})\"\n        else\n            log \"verify FAIL: ${desc} (expected ${expected}, got ${code})\"\n            failures=$((failures + 1))\n        fi\n    }\n    log \"verifying appliance endpoints (Host: ${GHES_HOSTNAME}).\"\n    check_code \"web root -> redirect to /login\" \"https://127.0.0.1/\"             '301|302' -H \"Host: ${GHES_HOSTNAME}\"\n    check_code \"login page reachable\"           \"https://127.0.0.1/login\"        '200'     -H \"Host: ${GHES_HOSTNAME}\"\n    check_code \"manage API requires auth\"       \"${BASE}/manage/v1/config/apply\" '401'\n    if (( failures > 0 )); then\n        if [[ \"$(lc \"$GHES_VERIFY_STRICT\")\" == \"true\" ]]; then\n            die \"endpoint self-verify failed (${failures} check(s)) and GHES_VERIFY_STRICT=true.\"\n        fi\n        log \"WARNING: endpoint self-verify reported ${failures} failure(s) (non-fatal; set GHES_VERIFY_STRICT=true to fail).\"\n    else\n        log \"endpoint self-verify: all checks passed.\"\n    fi\n    return 0\n}\ninit_ghes    || die \"GHES first-boot initialization failed.\"\nwait_ready   || die \"GHES Manage API did not become ready within ${GHES_READY_TIMEOUT_MIN}m.\"\nstage_settings\nif [[ \"$(lc \"$GHES_SKIP_APPLY\")\" == \"true\" ]]; then\n    log \"GHES_SKIP_APPLY=true - settings staged but skipping ghe-config-apply.\"\n    log \"post-config completed (staged only).\"\n    exit 0\nfi\nif apply_config; then\n    log \"post-config completed successfully.\"\n    verify_endpoints\n    log \"REMINDER: Active Directory objects, DNS records, and LDAP auth-mode remain MANUAL.\"\n    exit 0\nelse\n    die \"ghe-config-apply reported a non-zero exit; see the apply log above.\"\nfi\n",
+        "effectiveCustomLocationId": "[[if(empty(parameters('CustomLocationId')), resourceId('Microsoft.ExtendedLocation/customLocations', format('{0}-customlocation', parameters('clusterName'))), parameters('CustomLocationId'))]",
+        "maskToPrefix": {
+          "255.0.0.0": 8,
+          "255.255.0.0": 16,
+          "255.255.255.0": 24
+        },
+        "effectiveVmName": "[[if(empty(parameters('VmName')), format('{0}-1', parameters('VmNamePrefix')), parameters('VmName'))]",
+        "effectiveImageId": "[[if(parameters('CreateImage'), resourceId('Microsoft.AzureStackHCI/galleryImages', parameters('ImageName')), if(empty(parameters('ExistingImageResourceId')), resourceId('Microsoft.AzureStackHCI/galleryImages', parameters('ImageName')), parameters('ExistingImageResourceId')))]"
+      },
+      "resources": [
+        {
+          "condition": "[[parameters('CreateImage')]",
+          "type": "Microsoft.AzureStackHCI/galleryImages",
+          "apiVersion": "2025-04-01-preview",
+          "name": "[[parameters('ImageName')]",
+          "location": "[[parameters('Location')]",
+          "extendedLocation": {
+            "name": "[[variables('effectiveCustomLocationId')]",
+            "type": "CustomLocation"
+          },
+          "tags": {},
+          "properties": {
+            "osType": "Linux",
+            "hyperVGeneration": "V2",
+            "containerId": "[[parameters('StoragePathId')]",
+            "imagePath": "[[parameters('LocalSharePath')]"
+          }
+        },
+        {
+          "type": "Microsoft.AzureStackHCI/logicalNetworks",
+          "apiVersion": "2025-04-01-preview",
+          "name": "[[parameters('LogicalNetworkName')]",
+          "location": "[[parameters('Location')]",
+          "extendedLocation": {
+            "type": "CustomLocation",
+            "name": "[[variables('effectiveCustomLocationId')]"
+          },
+          "tags": {},
+          "properties": {
+            "subnets": [
+              {
+                "name": "[[parameters('LogicalNetworkName')]",
+                "properties": {
+                  "ipAllocationMethod": "[[parameters('IpAllocationMethod')]",
+                  "addressPrefix": "[[if(not(empty(parameters('AddressPrefix'))), parameters('AddressPrefix'), if(empty(if(equals(int(coalesce(tryGet(variables('maskToPrefix'), reference(resourceId('Microsoft.AzureStackHCI/clusters/deploymentSettings', split(format('{0}/default', parameters('clusterName')), '/')[0], split(format('{0}/default', parameters('clusterName')), '/')[1]), '2024-04-01').deploymentConfiguration.scaleUnits[0].deploymentData.infrastructureNetwork[0].subnetMask), 0)), 24), format('{0}.{1}.{2}.0', split(if(empty(parameters('DefaultGateway')), reference(resourceId('Microsoft.AzureStackHCI/clusters/deploymentSettings', split(format('{0}/default', parameters('clusterName')), '/')[0], split(format('{0}/default', parameters('clusterName')), '/')[1]), '2024-04-01').deploymentConfiguration.scaleUnits[0].deploymentData.infrastructureNetwork[0].gateway, parameters('DefaultGateway')), '.')[0], split(if(empty(parameters('DefaultGateway')), reference(resourceId('Microsoft.AzureStackHCI/clusters/deploymentSettings', split(format('{0}/default', parameters('clusterName')), '/')[0], split(format('{0}/default', parameters('clusterName')), '/')[1]), '2024-04-01').deploymentConfiguration.scaleUnits[0].deploymentData.infrastructureNetwork[0].gateway, parameters('DefaultGateway')), '.')[1], split(if(empty(parameters('DefaultGateway')), reference(resourceId('Microsoft.AzureStackHCI/clusters/deploymentSettings', split(format('{0}/default', parameters('clusterName')), '/')[0], split(format('{0}/default', parameters('clusterName')), '/')[1]), '2024-04-01').deploymentConfiguration.scaleUnits[0].deploymentData.infrastructureNetwork[0].gateway, parameters('DefaultGateway')), '.')[2]), if(equals(int(coalesce(tryGet(variables('maskToPrefix'), reference(resourceId('Microsoft.AzureStackHCI/clusters/deploymentSettings', split(format('{0}/default', parameters('clusterName')), '/')[0], split(format('{0}/default', parameters('clusterName')), '/')[1]), '2024-04-01').deploymentConfiguration.scaleUnits[0].deploymentData.infrastructureNetwork[0].subnetMask), 0)), 16), format('{0}.{1}.0.0', split(if(empty(parameters('DefaultGateway')), reference(resourceId('Microsoft.AzureStackHCI/clusters/deploymentSettings', split(format('{0}/default', parameters('clusterName')), '/')[0], split(format('{0}/default', parameters('clusterName')), '/')[1]), '2024-04-01').deploymentConfiguration.scaleUnits[0].deploymentData.infrastructureNetwork[0].gateway, parameters('DefaultGateway')), '.')[0], split(if(empty(parameters('DefaultGateway')), reference(resourceId('Microsoft.AzureStackHCI/clusters/deploymentSettings', split(format('{0}/default', parameters('clusterName')), '/')[0], split(format('{0}/default', parameters('clusterName')), '/')[1]), '2024-04-01').deploymentConfiguration.scaleUnits[0].deploymentData.infrastructureNetwork[0].gateway, parameters('DefaultGateway')), '.')[1]), if(equals(int(coalesce(tryGet(variables('maskToPrefix'), reference(resourceId('Microsoft.AzureStackHCI/clusters/deploymentSettings', split(format('{0}/default', parameters('clusterName')), '/')[0], split(format('{0}/default', parameters('clusterName')), '/')[1]), '2024-04-01').deploymentConfiguration.scaleUnits[0].deploymentData.infrastructureNetwork[0].subnetMask), 0)), 8), format('{0}.0.0.0', split(if(empty(parameters('DefaultGateway')), reference(resourceId('Microsoft.AzureStackHCI/clusters/deploymentSettings', split(format('{0}/default', parameters('clusterName')), '/')[0], split(format('{0}/default', parameters('clusterName')), '/')[1]), '2024-04-01').deploymentConfiguration.scaleUnits[0].deploymentData.infrastructureNetwork[0].gateway, parameters('DefaultGateway')), '.')[0]), '')))), '', format('{0}/{1}', if(equals(int(coalesce(tryGet(variables('maskToPrefix'), reference(resourceId('Microsoft.AzureStackHCI/clusters/deploymentSettings', split(format('{0}/default', parameters('clusterName')), '/')[0], split(format('{0}/default', parameters('clusterName')), '/')[1]), '2024-04-01').deploymentConfiguration.scaleUnits[0].deploymentData.infrastructureNetwork[0].subnetMask), 0)), 24), format('{0}.{1}.{2}.0', split(if(empty(parameters('DefaultGateway')), reference(resourceId('Microsoft.AzureStackHCI/clusters/deploymentSettings', split(format('{0}/default', parameters('clusterName')), '/')[0], split(format('{0}/default', parameters('clusterName')), '/')[1]), '2024-04-01').deploymentConfiguration.scaleUnits[0].deploymentData.infrastructureNetwork[0].gateway, parameters('DefaultGateway')), '.')[0], split(if(empty(parameters('DefaultGateway')), reference(resourceId('Microsoft.AzureStackHCI/clusters/deploymentSettings', split(format('{0}/default', parameters('clusterName')), '/')[0], split(format('{0}/default', parameters('clusterName')), '/')[1]), '2024-04-01').deploymentConfiguration.scaleUnits[0].deploymentData.infrastructureNetwork[0].gateway, parameters('DefaultGateway')), '.')[1], split(if(empty(parameters('DefaultGateway')), reference(resourceId('Microsoft.AzureStackHCI/clusters/deploymentSettings', split(format('{0}/default', parameters('clusterName')), '/')[0], split(format('{0}/default', parameters('clusterName')), '/')[1]), '2024-04-01').deploymentConfiguration.scaleUnits[0].deploymentData.infrastructureNetwork[0].gateway, parameters('DefaultGateway')), '.')[2]), if(equals(int(coalesce(tryGet(variables('maskToPrefix'), reference(resourceId('Microsoft.AzureStackHCI/clusters/deploymentSettings', split(format('{0}/default', parameters('clusterName')), '/')[0], split(format('{0}/default', parameters('clusterName')), '/')[1]), '2024-04-01').deploymentConfiguration.scaleUnits[0].deploymentData.infrastructureNetwork[0].subnetMask), 0)), 16), format('{0}.{1}.0.0', split(if(empty(parameters('DefaultGateway')), reference(resourceId('Microsoft.AzureStackHCI/clusters/deploymentSettings', split(format('{0}/default', parameters('clusterName')), '/')[0], split(format('{0}/default', parameters('clusterName')), '/')[1]), '2024-04-01').deploymentConfiguration.scaleUnits[0].deploymentData.infrastructureNetwork[0].gateway, parameters('DefaultGateway')), '.')[0], split(if(empty(parameters('DefaultGateway')), reference(resourceId('Microsoft.AzureStackHCI/clusters/deploymentSettings', split(format('{0}/default', parameters('clusterName')), '/')[0], split(format('{0}/default', parameters('clusterName')), '/')[1]), '2024-04-01').deploymentConfiguration.scaleUnits[0].deploymentData.infrastructureNetwork[0].gateway, parameters('DefaultGateway')), '.')[1]), if(equals(int(coalesce(tryGet(variables('maskToPrefix'), reference(resourceId('Microsoft.AzureStackHCI/clusters/deploymentSettings', split(format('{0}/default', parameters('clusterName')), '/')[0], split(format('{0}/default', parameters('clusterName')), '/')[1]), '2024-04-01').deploymentConfiguration.scaleUnits[0].deploymentData.infrastructureNetwork[0].subnetMask), 0)), 8), format('{0}.0.0.0', split(if(empty(parameters('DefaultGateway')), reference(resourceId('Microsoft.AzureStackHCI/clusters/deploymentSettings', split(format('{0}/default', parameters('clusterName')), '/')[0], split(format('{0}/default', parameters('clusterName')), '/')[1]), '2024-04-01').deploymentConfiguration.scaleUnits[0].deploymentData.infrastructureNetwork[0].gateway, parameters('DefaultGateway')), '.')[0]), ''))), int(coalesce(tryGet(variables('maskToPrefix'), reference(resourceId('Microsoft.AzureStackHCI/clusters/deploymentSettings', split(format('{0}/default', parameters('clusterName')), '/')[0], split(format('{0}/default', parameters('clusterName')), '/')[1]), '2024-04-01').deploymentConfiguration.scaleUnits[0].deploymentData.infrastructureNetwork[0].subnetMask), 0)))))]",
+                  "vlan": "[[parameters('Vlan')]",
+                  "ipPools": [
+                    {
+                      "name": "[[format('{0}_ippool', parameters('LogicalNetworkName'))]",
+                      "start": "[[parameters('StartIp')]",
+                      "end": "[[parameters('EndIp')]"
+                    }
+                  ],
+                  "routeTable": {
+                    "properties": {
+                      "routes": [
+                        {
+                          "name": "[[parameters('LogicalNetworkName')]",
+                          "properties": {
+                            "addressPrefix": "0.0.0.0/0",
+                            "nextHopIpAddress": "[[if(empty(parameters('DefaultGateway')), reference(resourceId('Microsoft.AzureStackHCI/clusters/deploymentSettings', split(format('{0}/default', parameters('clusterName')), '/')[0], split(format('{0}/default', parameters('clusterName')), '/')[1]), '2024-04-01').deploymentConfiguration.scaleUnits[0].deploymentData.infrastructureNetwork[0].gateway, parameters('DefaultGateway'))]"
+                          }
+                        }
+                      ]
+                    }
+                  }
+                }
+              }
+            ],
+            "vmSwitchName": "[[if(not(empty(parameters('VmSwitchName'))), parameters('VmSwitchName'), format('ConvergedSwitch({0})', toLower(reference(resourceId('Microsoft.AzureStackHCI/clusters/deploymentSettings', split(format('{0}/default', parameters('clusterName')), '/')[0], split(format('{0}/default', parameters('clusterName')), '/')[1]), '2024-04-01').deploymentConfiguration.scaleUnits[0].deploymentData.hostNetwork.intents[0].name)))]",
+            "dhcpOptions": {
+              "dnsServers": "[[if(empty(parameters('DnsServers')), reference(resourceId('Microsoft.AzureStackHCI/clusters/deploymentSettings', split(format('{0}/default', parameters('clusterName')), '/')[0], split(format('{0}/default', parameters('clusterName')), '/')[1]), '2024-04-01').deploymentConfiguration.scaleUnits[0].deploymentData.infrastructureNetwork[0].dnsServers, parameters('DnsServers'))]"
+            }
+          }
+        },
+        {
+          "[string('copy')]": {
+            "name": "dataDisks",
+            "count": "[[length(range(0, parameters('NumberDataDisks')))]"
+          },
+          "type": "Microsoft.AzureStackHCI/virtualHardDisks",
+          "apiVersion": "2025-04-01-preview",
+          "name": "[[format('{0}-datadisk{1}', variables('effectiveVmName'), range(0, parameters('NumberDataDisks'))[copyIndex()])]",
+          "location": "[[parameters('Location')]",
+          "extendedLocation": {
+            "type": "CustomLocation",
+            "name": "[[variables('effectiveCustomLocationId')]"
+          },
+          "properties": {
+            "diskSizeGB": "[[parameters('DiskSizeGB')]",
+            "dynamic": true
+          }
+        },
+        {
+          "type": "Microsoft.HybridCompute/machines",
+          "apiVersion": "2023-06-20-preview",
+          "name": "[[variables('effectiveVmName')]",
+          "location": "[[parameters('Location')]",
+          "kind": "HCI",
+          "identity": {
+            "type": "SystemAssigned"
+          }
+        },
+        {
+          "type": "Microsoft.AzureStackHCI/networkInterfaces",
+          "apiVersion": "2025-04-01-preview",
+          "name": "[[variables('effectiveVmName')]",
+          "location": "[[parameters('Location')]",
+          "extendedLocation": {
+            "type": "CustomLocation",
+            "name": "[[variables('effectiveCustomLocationId')]"
+          },
+          "properties": {
+            "ipConfigurations": [
+              {
+                "name": "[[variables('effectiveVmName')]",
+                "properties": {
+                  "gateway": "[[if(empty(parameters('DefaultGateway')), reference(resourceId('Microsoft.AzureStackHCI/clusters/deploymentSettings', split(format('{0}/default', parameters('clusterName')), '/')[0], split(format('{0}/default', parameters('clusterName')), '/')[1]), '2024-04-01').deploymentConfiguration.scaleUnits[0].deploymentData.infrastructureNetwork[0].gateway, parameters('DefaultGateway'))]",
+                  "privateIPAddress": "[[parameters('StartIp')]",
+                  "subnet": {
+                    "id": "[[resourceId('Microsoft.AzureStackHCI/logicalNetworks', parameters('LogicalNetworkName'))]"
+                  }
+                }
+              }
+            ]
+          },
+          "dependsOn": [
+            "[[resourceId('Microsoft.AzureStackHCI/logicalNetworks', parameters('LogicalNetworkName'))]"
+          ]
+        },
+        {
+          "type": "Microsoft.Resources/deployments",
+          "apiVersion": "2022-09-01",
+          "name": "ghes-secrets",
+          "properties": {
+            "mode": "Incremental",
+            "expressionEvaluationOptions": {
+              "scope": "inner"
+            },
+            "parameters": {
+              "Location": {
+                "value": "[[parameters('Location')]"
+              },
+              "VmName": {
+                "value": "[[variables('effectiveVmName')]"
+              },
+              "CustomLocationId": {
+                "value": "[[variables('effectiveCustomLocationId')]"
+              },
+              "ImageId": {
+                "value": "[[variables('effectiveImageId')]"
+              },
+              "StoragePathId": {
+                "value": "[[parameters('StoragePathId')]"
+              },
+              "AdminUsername": {
+                "value": "[[parameters('AdminUsername')]"
+              },
+              "CPU": {
+                "value": "[[parameters('CPU')]"
+              },
+              "Memory": {
+                "value": "[[parameters('Memory')]"
+              },
+              "NumberDataDisks": {
+                "value": "[[parameters('NumberDataDisks')]"
+              },
+              "DiskSizeGB": {
+                "value": "[[parameters('DiskSizeGB')]"
+              },
+              "RunCommandName": {
+                "value": "[[parameters('RunCommandName')]"
+              },
+              "AsyncExecution": {
+                "value": "[[parameters('AsyncExecution')]"
+              },
+              "ApplyTimeoutMinutes": {
+                "value": "[[parameters('ApplyTimeoutMinutes')]"
+              },
+              "ReadyTimeoutMinutes": {
+                "value": "[[parameters('ReadyTimeoutMinutes')]"
+              },
+              "SkipApply": {
+                "value": "[[parameters('SkipApply')]"
+              },
+              "SubdomainIsolation": {
+                "value": "[[parameters('SubdomainIsolation')]"
+              },
+              "SignupEnabled": {
+                "value": "[[parameters('SignupEnabled')]"
+              },
+              "PublicPages": {
+                "value": "[[parameters('PublicPages')]"
+              },
+              "ManagePort": {
+                "value": "[[parameters('ManagePort')]"
+              },
+              "PostConfigScript": {
+                "value": "[[variables('$fxv#0')]"
+              },
+              "GithubHostName": {
+                "value": "[[if(not(empty(parameters('GithubHostName'))), parameters('GithubHostName'), format('{0}.{1}', parameters('GithubHostLabel'), reference(resourceId('Microsoft.AzureStackHCI/clusters/deploymentSettings', split(format('{0}/default', parameters('clusterName')), '/')[0], split(format('{0}/default', parameters('clusterName')), '/')[1]), '2024-04-01').deploymentConfiguration.scaleUnits[0].deploymentData.domainFqdn))]"
+              },
+              "AdminPassword": {
+                "reference": {
+                  "keyVault": {
+                    "id": "[[parameters('KeyVaultId')]"
+                  },
+                  "secretName": "[[parameters('AdminPasswordKeyName')]"
+                }
+              },
+              "ManagementConsolePassword": {
+                "reference": {
+                  "keyVault": {
+                    "id": "[[parameters('KeyVaultId')]"
+                  },
+                  "secretName": "[[parameters('ManagementConsolePasswordKeyName')]"
+                }
+              },
+              "LicenseBase64Part1": {
+                "reference": {
+                  "keyVault": {
+                    "id": "[[parameters('KeyVaultId')]"
+                  },
+                  "secretName": "[[parameters('LicenseBase64Part1KeyName')]"
+                }
+              },
+              "LicenseBase64Part2": {
+                "reference": {
+                  "keyVault": {
+                    "id": "[[parameters('KeyVaultId')]"
+                  },
+                  "secretName": "[[parameters('LicenseBase64Part2KeyName')]"
+                }
+              }
+            },
+            "template": {
+              "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+              "contentVersion": "1.0.0.0",
+              "parameters": {
+                "Location": {
+                  "type": "string"
+                },
+                "VmName": {
+                  "type": "string"
+                },
+                "CustomLocationId": {
+                  "type": "string"
+                },
+                "ImageId": {
+                  "type": "string"
+                },
+                "StoragePathId": {
+                  "type": "string"
+                },
+                "AdminUsername": {
+                  "type": "string"
+                },
+                "AdminPassword": {
+                  "type": "securestring"
+                },
+                "CPU": {
+                  "type": "int"
+                },
+                "Memory": {
+                  "type": "int"
+                },
+                "NumberDataDisks": {
+                  "type": "int"
+                },
+                "DiskSizeGB": {
+                  "type": "int"
+                },
+                "RunCommandName": {
+                  "type": "string"
+                },
+                "AsyncExecution": {
+                  "type": "bool"
+                },
+                "ApplyTimeoutMinutes": {
+                  "type": "int"
+                },
+                "ReadyTimeoutMinutes": {
+                  "type": "int"
+                },
+                "SkipApply": {
+                  "type": "bool"
+                },
+                "SubdomainIsolation": {
+                  "type": "bool"
+                },
+                "SignupEnabled": {
+                  "type": "bool"
+                },
+                "PublicPages": {
+                  "type": "bool"
+                },
+                "ManagePort": {
+                  "type": "int"
+                },
+                "PostConfigScript": {
+                  "type": "string"
+                },
+                "GithubHostName": {
+                  "type": "string"
+                },
+                "ManagementConsolePassword": {
+                  "type": "securestring"
+                },
+                "LicenseBase64Part1": {
+                  "type": "securestring"
+                },
+                "LicenseBase64Part2": {
+                  "type": "securestring"
+                }
+              },
+              "resources": [
+                {
+                  "type": "Microsoft.AzureStackHCI/virtualMachineInstances",
+                  "apiVersion": "2025-04-01-preview",
+                  "scope": "[[resourceId('Microsoft.HybridCompute/machines', parameters('VmName'))]",
+                  "name": "default",
+                  "extendedLocation": {
+                    "type": "CustomLocation",
+                    "name": "[[parameters('CustomLocationId')]"
+                  },
+                  "properties": {
+                    "osProfile": {
+                      "adminUsername": "[[parameters('AdminUsername')]",
+                      "adminPassword": "[[parameters('AdminPassword')]",
+                      "computerName": "[[parameters('VmName')]",
+                      "linuxConfiguration": {
+                        "provisionVMAgent": true,
+                        "provisionVMConfigAgent": true
+                      }
+                    },
+                    "hardwareProfile": {
+                      "vmSize": "Default",
+                      "processors": "[[parameters('CPU')]",
+                      "memoryMB": "[[parameters('Memory')]"
+                    },
+                    "securityProfile": {
+                      "uefiSettings": {
+                        "secureBootEnabled": false
+                      }
+                    },
+                    "storageProfile": {
+                      "[string('copy')]": [
+                        {
+                          "name": "dataDisks",
+                          "count": "[[length(range(0, parameters('NumberDataDisks')))]",
+                          "input": {
+                            "id": "[[resourceId('Microsoft.AzureStackHCI/virtualHardDisks', format('{0}-datadisk{1}', parameters('VmName'), range(0, parameters('NumberDataDisks'))[copyIndex('dataDisks')]))]"
+                          }
+                        }
+                      ],
+                      "imageReference": {
+                        "id": "[[parameters('ImageId')]"
+                      },
+                      "vmConfigStoragePathId": "[[parameters('StoragePathId')]"
+                    },
+                    "networkProfile": {
+                      "networkInterfaces": [
+                        {
+                          "id": "[[resourceId('Microsoft.AzureStackHCI/networkInterfaces', parameters('VmName'))]"
+                        }
+                      ]
+                    },
+                    "httpProxyConfig": {}
+                  }
+                },
+                {
+                  "type": "Microsoft.HybridCompute/machines/runCommands",
+                  "apiVersion": "2024-07-10",
+                  "name": "[[format('{0}/{1}', parameters('VmName'), parameters('RunCommandName'))]",
+                  "location": "[[parameters('Location')]",
+                  "properties": {
+                    "asyncExecution": "[[parameters('AsyncExecution')]",
+                    "timeoutInSeconds": "[[mul(add(add(parameters('ReadyTimeoutMinutes'), parameters('ApplyTimeoutMinutes')), 30), 60)]",
+                    "source": {
+                      "script": "[[parameters('PostConfigScript')]"
+                    },
+                    "parameters": [
+                      {
+                        "name": "GHES_HOSTNAME",
+                        "value": "[[parameters('GithubHostName')]"
+                      },
+                      {
+                        "name": "GHES_SUBDOMAIN_ISOLATION",
+                        "value": "[[string(parameters('SubdomainIsolation'))]"
+                      },
+                      {
+                        "name": "GHES_SIGNUP_ENABLED",
+                        "value": "[[string(parameters('SignupEnabled'))]"
+                      },
+                      {
+                        "name": "GHES_PUBLIC_PAGES",
+                        "value": "[[string(parameters('PublicPages'))]"
+                      },
+                      {
+                        "name": "GHES_MANAGE_PORT",
+                        "value": "[[string(parameters('ManagePort'))]"
+                      },
+                      {
+                        "name": "GHES_APPLY_TIMEOUT_MIN",
+                        "value": "[[string(parameters('ApplyTimeoutMinutes'))]"
+                      },
+                      {
+                        "name": "GHES_READY_TIMEOUT_MIN",
+                        "value": "[[string(parameters('ReadyTimeoutMinutes'))]"
+                      },
+                      {
+                        "name": "GHES_SKIP_APPLY",
+                        "value": "[[string(parameters('SkipApply'))]"
+                      }
+                    ],
+                    "protectedParameters": [
+                      {
+                        "name": "GHES_MGMT_PASSWORD",
+                        "value": "[[parameters('ManagementConsolePassword')]"
+                      },
+                      {
+                        "name": "GHES_LICENSE_B64_PART1",
+                        "value": "[[parameters('LicenseBase64Part1')]"
+                      },
+                      {
+                        "name": "GHES_LICENSE_B64_PART2",
+                        "value": "[[parameters('LicenseBase64Part2')]"
+                      }
+                    ]
+                  },
+                  "dependsOn": [
+                    "[[extensionResourceId(resourceId('Microsoft.HybridCompute/machines', parameters('VmName')), 'Microsoft.AzureStackHCI/virtualMachineInstances', 'default')]"
+                  ]
+                }
+              ]
+            }
+          },
+          "dependsOn": [
+            "[[resourceId('Microsoft.HybridCompute/machines', variables('effectiveVmName'))]",
+            "dataDisks",
+            "[[resourceId('Microsoft.AzureStackHCI/galleryImages', parameters('ImageName'))]",
+            "[[resourceId('Microsoft.AzureStackHCI/networkInterfaces', variables('effectiveVmName'))]"
+          ]
+        }
+      ],
+      "outputs": {
+        "imageId": {
+          "type": "string",
+          "metadata": {
+            "description": "Resource ID of the gallery image used by the VM (created or existing)."
+          },
+          "value": "[[variables('effectiveImageId')]"
+        },
+        "logicalNetworkId": {
+          "type": "string",
+          "metadata": {
+            "description": "Resource ID of the created logical network."
+          },
+          "value": "[[resourceId('Microsoft.AzureStackHCI/logicalNetworks', parameters('LogicalNetworkName'))]"
+        },
+        "machineId": {
+          "type": "string",
+          "metadata": {
+            "description": "Resource ID of the Arc HybridCompute machine."
+          },
+          "value": "[[resourceId('Microsoft.HybridCompute/machines', variables('effectiveVmName'))]"
+        },
+        "runCommandResourceId": {
+          "type": "string",
+          "metadata": {
+            "description": "Resource ID of the post-config Run Command."
+          },
+          "value": "[[resourceId('Microsoft.HybridCompute/machines/runCommands', variables('effectiveVmName'), parameters('RunCommandName'))]"
+        },
+        "resolvedCustomLocationId": {
+          "type": "string",
+          "metadata": {
+            "description": "Resolved custom location resource ID."
+          },
+          "value": "[[variables('effectiveCustomLocationId')]"
+        },
+        "resolvedGateway": {
+          "type": "string",
+          "metadata": {
+            "description": "Resolved default gateway."
+          },
+          "value": "[[if(empty(parameters('DefaultGateway')), reference(resourceId('Microsoft.AzureStackHCI/clusters/deploymentSettings', split(format('{0}/default', parameters('clusterName')), '/')[0], split(format('{0}/default', parameters('clusterName')), '/')[1]), '2024-04-01').deploymentConfiguration.scaleUnits[0].deploymentData.infrastructureNetwork[0].gateway, parameters('DefaultGateway'))]"
+        },
+        "resolvedAddressPrefix": {
+          "type": "string",
+          "metadata": {
+            "description": "Resolved subnet CIDR (address prefix)."
+          },
+          "value": "[[if(not(empty(parameters('AddressPrefix'))), parameters('AddressPrefix'), if(empty(if(equals(int(coalesce(tryGet(variables('maskToPrefix'), reference(resourceId('Microsoft.AzureStackHCI/clusters/deploymentSettings', split(format('{0}/default', parameters('clusterName')), '/')[0], split(format('{0}/default', parameters('clusterName')), '/')[1]), '2024-04-01').deploymentConfiguration.scaleUnits[0].deploymentData.infrastructureNetwork[0].subnetMask), 0)), 24), format('{0}.{1}.{2}.0', split(if(empty(parameters('DefaultGateway')), reference(resourceId('Microsoft.AzureStackHCI/clusters/deploymentSettings', split(format('{0}/default', parameters('clusterName')), '/')[0], split(format('{0}/default', parameters('clusterName')), '/')[1]), '2024-04-01').deploymentConfiguration.scaleUnits[0].deploymentData.infrastructureNetwork[0].gateway, parameters('DefaultGateway')), '.')[0], split(if(empty(parameters('DefaultGateway')), reference(resourceId('Microsoft.AzureStackHCI/clusters/deploymentSettings', split(format('{0}/default', parameters('clusterName')), '/')[0], split(format('{0}/default', parameters('clusterName')), '/')[1]), '2024-04-01').deploymentConfiguration.scaleUnits[0].deploymentData.infrastructureNetwork[0].gateway, parameters('DefaultGateway')), '.')[1], split(if(empty(parameters('DefaultGateway')), reference(resourceId('Microsoft.AzureStackHCI/clusters/deploymentSettings', split(format('{0}/default', parameters('clusterName')), '/')[0], split(format('{0}/default', parameters('clusterName')), '/')[1]), '2024-04-01').deploymentConfiguration.scaleUnits[0].deploymentData.infrastructureNetwork[0].gateway, parameters('DefaultGateway')), '.')[2]), if(equals(int(coalesce(tryGet(variables('maskToPrefix'), reference(resourceId('Microsoft.AzureStackHCI/clusters/deploymentSettings', split(format('{0}/default', parameters('clusterName')), '/')[0], split(format('{0}/default', parameters('clusterName')), '/')[1]), '2024-04-01').deploymentConfiguration.scaleUnits[0].deploymentData.infrastructureNetwork[0].subnetMask), 0)), 16), format('{0}.{1}.0.0', split(if(empty(parameters('DefaultGateway')), reference(resourceId('Microsoft.AzureStackHCI/clusters/deploymentSettings', split(format('{0}/default', parameters('clusterName')), '/')[0], split(format('{0}/default', parameters('clusterName')), '/')[1]), '2024-04-01').deploymentConfiguration.scaleUnits[0].deploymentData.infrastructureNetwork[0].gateway, parameters('DefaultGateway')), '.')[0], split(if(empty(parameters('DefaultGateway')), reference(resourceId('Microsoft.AzureStackHCI/clusters/deploymentSettings', split(format('{0}/default', parameters('clusterName')), '/')[0], split(format('{0}/default', parameters('clusterName')), '/')[1]), '2024-04-01').deploymentConfiguration.scaleUnits[0].deploymentData.infrastructureNetwork[0].gateway, parameters('DefaultGateway')), '.')[1]), if(equals(int(coalesce(tryGet(variables('maskToPrefix'), reference(resourceId('Microsoft.AzureStackHCI/clusters/deploymentSettings', split(format('{0}/default', parameters('clusterName')), '/')[0], split(format('{0}/default', parameters('clusterName')), '/')[1]), '2024-04-01').deploymentConfiguration.scaleUnits[0].deploymentData.infrastructureNetwork[0].subnetMask), 0)), 8), format('{0}.0.0.0', split(if(empty(parameters('DefaultGateway')), reference(resourceId('Microsoft.AzureStackHCI/clusters/deploymentSettings', split(format('{0}/default', parameters('clusterName')), '/')[0], split(format('{0}/default', parameters('clusterName')), '/')[1]), '2024-04-01').deploymentConfiguration.scaleUnits[0].deploymentData.infrastructureNetwork[0].gateway, parameters('DefaultGateway')), '.')[0]), '')))), '', format('{0}/{1}', if(equals(int(coalesce(tryGet(variables('maskToPrefix'), reference(resourceId('Microsoft.AzureStackHCI/clusters/deploymentSettings', split(format('{0}/default', parameters('clusterName')), '/')[0], split(format('{0}/default', parameters('clusterName')), '/')[1]), '2024-04-01').deploymentConfiguration.scaleUnits[0].deploymentData.infrastructureNetwork[0].subnetMask), 0)), 24), format('{0}.{1}.{2}.0', split(if(empty(parameters('DefaultGateway')), reference(resourceId('Microsoft.AzureStackHCI/clusters/deploymentSettings', split(format('{0}/default', parameters('clusterName')), '/')[0], split(format('{0}/default', parameters('clusterName')), '/')[1]), '2024-04-01').deploymentConfiguration.scaleUnits[0].deploymentData.infrastructureNetwork[0].gateway, parameters('DefaultGateway')), '.')[0], split(if(empty(parameters('DefaultGateway')), reference(resourceId('Microsoft.AzureStackHCI/clusters/deploymentSettings', split(format('{0}/default', parameters('clusterName')), '/')[0], split(format('{0}/default', parameters('clusterName')), '/')[1]), '2024-04-01').deploymentConfiguration.scaleUnits[0].deploymentData.infrastructureNetwork[0].gateway, parameters('DefaultGateway')), '.')[1], split(if(empty(parameters('DefaultGateway')), reference(resourceId('Microsoft.AzureStackHCI/clusters/deploymentSettings', split(format('{0}/default', parameters('clusterName')), '/')[0], split(format('{0}/default', parameters('clusterName')), '/')[1]), '2024-04-01').deploymentConfiguration.scaleUnits[0].deploymentData.infrastructureNetwork[0].gateway, parameters('DefaultGateway')), '.')[2]), if(equals(int(coalesce(tryGet(variables('maskToPrefix'), reference(resourceId('Microsoft.AzureStackHCI/clusters/deploymentSettings', split(format('{0}/default', parameters('clusterName')), '/')[0], split(format('{0}/default', parameters('clusterName')), '/')[1]), '2024-04-01').deploymentConfiguration.scaleUnits[0].deploymentData.infrastructureNetwork[0].subnetMask), 0)), 16), format('{0}.{1}.0.0', split(if(empty(parameters('DefaultGateway')), reference(resourceId('Microsoft.AzureStackHCI/clusters/deploymentSettings', split(format('{0}/default', parameters('clusterName')), '/')[0], split(format('{0}/default', parameters('clusterName')), '/')[1]), '2024-04-01').deploymentConfiguration.scaleUnits[0].deploymentData.infrastructureNetwork[0].gateway, parameters('DefaultGateway')), '.')[0], split(if(empty(parameters('DefaultGateway')), reference(resourceId('Microsoft.AzureStackHCI/clusters/deploymentSettings', split(format('{0}/default', parameters('clusterName')), '/')[0], split(format('{0}/default', parameters('clusterName')), '/')[1]), '2024-04-01').deploymentConfiguration.scaleUnits[0].deploymentData.infrastructureNetwork[0].gateway, parameters('DefaultGateway')), '.')[1]), if(equals(int(coalesce(tryGet(variables('maskToPrefix'), reference(resourceId('Microsoft.AzureStackHCI/clusters/deploymentSettings', split(format('{0}/default', parameters('clusterName')), '/')[0], split(format('{0}/default', parameters('clusterName')), '/')[1]), '2024-04-01').deploymentConfiguration.scaleUnits[0].deploymentData.infrastructureNetwork[0].subnetMask), 0)), 8), format('{0}.0.0.0', split(if(empty(parameters('DefaultGateway')), reference(resourceId('Microsoft.AzureStackHCI/clusters/deploymentSettings', split(format('{0}/default', parameters('clusterName')), '/')[0], split(format('{0}/default', parameters('clusterName')), '/')[1]), '2024-04-01').deploymentConfiguration.scaleUnits[0].deploymentData.infrastructureNetwork[0].gateway, parameters('DefaultGateway')), '.')[0]), ''))), int(coalesce(tryGet(variables('maskToPrefix'), reference(resourceId('Microsoft.AzureStackHCI/clusters/deploymentSettings', split(format('{0}/default', parameters('clusterName')), '/')[0], split(format('{0}/default', parameters('clusterName')), '/')[1]), '2024-04-01').deploymentConfiguration.scaleUnits[0].deploymentData.infrastructureNetwork[0].subnetMask), 0)))))]"
+        },
+        "resolvedDnsServers": {
+          "type": "array",
+          "metadata": {
+            "description": "Resolved DNS servers."
+          },
+          "value": "[[if(empty(parameters('DnsServers')), reference(resourceId('Microsoft.AzureStackHCI/clusters/deploymentSettings', split(format('{0}/default', parameters('clusterName')), '/')[0], split(format('{0}/default', parameters('clusterName')), '/')[1]), '2024-04-01').deploymentConfiguration.scaleUnits[0].deploymentData.infrastructureNetwork[0].dnsServers, parameters('DnsServers'))]"
+        },
+        "resolvedVmSwitchName": {
+          "type": "string",
+          "metadata": {
+            "description": "Resolved VM switch name."
+          },
+          "value": "[[if(not(empty(parameters('VmSwitchName'))), parameters('VmSwitchName'), format('ConvergedSwitch({0})', toLower(reference(resourceId('Microsoft.AzureStackHCI/clusters/deploymentSettings', split(format('{0}/default', parameters('clusterName')), '/')[0], split(format('{0}/default', parameters('clusterName')), '/')[1]), '2024-04-01').deploymentConfiguration.scaleUnits[0].deploymentData.hostNetwork.intents[0].name)))]"
+        },
+        "resolvedDomainFqdn": {
+          "type": "string",
+          "metadata": {
+            "description": "Resolved AD domain FQDN."
+          },
+          "value": "[[reference(resourceId('Microsoft.AzureStackHCI/clusters/deploymentSettings', split(format('{0}/default', parameters('clusterName')), '/')[0], split(format('{0}/default', parameters('clusterName')), '/')[1]), '2024-04-01').deploymentConfiguration.scaleUnits[0].deploymentData.domainFqdn]"
+        },
+        "resolvedVmName": {
+          "type": "string",
+          "metadata": {
+            "description": "Resolved VM name."
+          },
+          "value": "[[variables('effectiveVmName')]"
+        },
+        "resolvedGithubHostName": {
+          "type": "string",
+          "metadata": {
+            "description": "Resolved GHES hostname (FQDN)."
+          },
+          "value": "[[if(not(empty(parameters('GithubHostName'))), parameters('GithubHostName'), format('{0}.{1}', parameters('GithubHostLabel'), reference(resourceId('Microsoft.AzureStackHCI/clusters/deploymentSettings', split(format('{0}/default', parameters('clusterName')), '/')[0], split(format('{0}/default', parameters('clusterName')), '/')[1]), '2024-04-01').deploymentConfiguration.scaleUnits[0].deploymentData.domainFqdn))]"
+        }
+      }
+    },
+    "licenseLength": "[length(parameters('LicenseBase64'))]",
+    "licenseHalf": "[div(variables('licenseLength'), 2)]",
+    "licensePart1": "[substring(parameters('LicenseBase64'), 0, variables('licenseHalf'))]",
+    "licensePart2": "[substring(parameters('LicenseBase64'), variables('licenseHalf'), sub(variables('licenseLength'), variables('licenseHalf')))]",
+    "createContext": "[empty(parameters('existingContextId'))]",
+    "contextIdParts": "[split(if(variables('createContext'), resourceId('Microsoft.Edge/contexts', variables('contextName')), parameters('existingContextId')), '/')]",
+    "existingContextSubscriptionId": "[variables('contextIdParts')[2]]",
+    "existingContextResourceGroup": "[variables('contextIdParts')[4]]",
+    "existingContextName": "[variables('contextIdParts')[8]]",
+    "effectiveContextId": "[if(variables('createContext'), resourceId('Microsoft.Edge/contexts', variables('contextName')), parameters('existingContextId'))]"
+  },
+  "resources": {
+    "ghesSolutionTemplate::solutionVersion": {
+      "type": "Microsoft.Edge/solutionTemplates/versions",
+      "apiVersion": "2026-05-01-preview",
+      "name": "[format('{0}/{1}', variables('ghesSolutionTemplateName'), variables('ghesSolutionTemplateVersionName'))]",
+      "properties": {
+        "configurations": {
+          "configs": {
+            "clusterName": "[parameters('clusterName')]",
+            "ImageName": "[variables('VmImageName')]",
+            "CustomLocationId": "[variables('CustomLocationId')]",
+            "LocalSharePath": "[parameters('LocalSharePath')]",
+            "StoragePathId": "[parameters('StoragePathId')]",
+            "CreateImage": "[variables('CreateImage')]",
+            "ExistingImageResourceId": "[variables('ExistingImageResourceId')]",
+            "LogicalNetworkName": "[parameters('LogicalNetworkName')]",
+            "IpAllocationMethod": "[variables('IpAllocationMethod')]",
+            "AddressPrefix": "[variables('AddressPrefix')]",
+            "Vlan": "[variables('Vlan')]",
+            "Location": "[variables('Location')]",
+            "VmSwitchName": "[variables('VmSwitchName')]",
+            "StartIp": "[parameters('StartIp')]",
+            "EndIp": "[parameters('EndIp')]",
+            "DnsServers": "[variables('DnsServers')]",
+            "DefaultGateway": "[variables('DefaultGateway')]",
+            "VmName": "[parameters('VmName')]",
+            "VmNamePrefix": "[variables('VmNamePrefix')]",
+            "KeyVaultId": "[resourceId('Microsoft.KeyVault/vaults', parameters('KeyVaultName'))]",
+            "AdminUsername": "[parameters('AdminUsername')]",
+            "AdminPasswordKeyName": "[variables('AdminPasswordSecretName')]",
+            "CPU": "[parameters('CPU')]",
+            "Memory": "[parameters('Memory')]",
+            "NumberDataDisks": "[parameters('NumberDataDisks')]",
+            "DiskSizeGB": "[parameters('DiskSizeGB')]",
+            "ManagementConsolePasswordKeyName": "[variables('ManagementConsolePasswordSecretName')]",
+            "GithubHostName": "[variables('GithubHostName')]",
+            "GithubHostLabel": "[variables('GithubHostLabel')]",
+            "LicenseBase64Part1KeyName": "[variables('LicensePart1SecretName')]",
+            "LicenseBase64Part2KeyName": "[variables('LicensePart2SecretName')]",
+            "SubdomainIsolation": "[variables('SubdomainIsolation')]",
+            "SignupEnabled": "[variables('SignupEnabled')]",
+            "PublicPages": "[variables('PublicPages')]",
+            "ManagePort": "[variables('ManagePort')]",
+            "ApplyTimeoutMinutes": "[variables('ApplyTimeoutMinutes')]",
+            "ReadyTimeoutMinutes": "[variables('ReadyTimeoutMinutes')]",
+            "SkipApply": "[variables('SkipApply')]",
+            "AsyncExecution": "[variables('AsyncExecution')]",
+            "RunCommandName": "[variables('RunCommandName')]"
+          }
+        },
+        "specification": {
+          "components": [
+            {
+              "name": "ghesAll",
+              "type": "armtemplate",
+              "properties": {
+                "template": {
+                  "subscriptionId": "[subscription().subscriptionId]",
+                  "resourceGroupName": "[resourceGroup().name]",
+                  "name": "[variables('ghesSpecName')]",
+                  "version": "[variables('ghesSpecVersion')]"
+                }
+              }
+            }
+          ]
+        }
+      },
+      "dependsOn": [
+        "adminPasswordSecret",
+        "ghesSolutionTemplate",
+        "ghesTemplateSpec",
+        "ghesTemplateSpecVersion",
+        "keyVault",
+        "licensePart1Secret",
+        "licensePart2Secret",
+        "managementConsolePasswordSecret"
+      ]
+    },
+    "keyVault": {
+      "type": "Microsoft.KeyVault/vaults",
+      "apiVersion": "2023-07-01",
+      "name": "[parameters('KeyVaultName')]",
+      "location": "[variables('Location')]",
+      "properties": {
+        "tenantId": "[variables('TenantId')]",
+        "sku": {
+          "family": "A",
+          "name": "[variables('KeyVaultSkuName')]"
+        },
+        "enableRbacAuthorization": "[variables('EnableRbacAuthorization')]",
+        "enabledForTemplateDeployment": true,
+        "enableSoftDelete": true,
+        "softDeleteRetentionInDays": "[variables('SoftDeleteRetentionInDays')]",
+        "publicNetworkAccess": "Enabled"
+      }
+    },
+    "adminPasswordSecret": {
+      "type": "Microsoft.KeyVault/vaults/secrets",
+      "apiVersion": "2023-07-01",
+      "name": "[format('{0}/{1}', parameters('KeyVaultName'), variables('AdminPasswordSecretName'))]",
+      "properties": {
+        "value": "[parameters('AdminPassword')]",
+        "contentType": "GHES VM administrator password"
+      },
+      "dependsOn": [
+        "keyVault"
+      ]
+    },
+    "managementConsolePasswordSecret": {
+      "type": "Microsoft.KeyVault/vaults/secrets",
+      "apiVersion": "2023-07-01",
+      "name": "[format('{0}/{1}', parameters('KeyVaultName'), variables('ManagementConsolePasswordSecretName'))]",
+      "properties": {
+        "value": "[parameters('ManagementConsolePassword')]",
+        "contentType": "GHES management-console password"
+      },
+      "dependsOn": [
+        "keyVault"
+      ]
+    },
+    "licensePart1Secret": {
+      "type": "Microsoft.KeyVault/vaults/secrets",
+      "apiVersion": "2023-07-01",
+      "name": "[format('{0}/{1}', parameters('KeyVaultName'), variables('LicensePart1SecretName'))]",
+      "properties": {
+        "value": "[variables('licensePart1')]",
+        "contentType": "GHES license base64 (part 1 of 2)"
+      },
+      "dependsOn": [
+        "keyVault"
+      ]
+    },
+    "licensePart2Secret": {
+      "type": "Microsoft.KeyVault/vaults/secrets",
+      "apiVersion": "2023-07-01",
+      "name": "[format('{0}/{1}', parameters('KeyVaultName'), variables('LicensePart2SecretName'))]",
+      "properties": {
+        "value": "[variables('licensePart2')]",
+        "contentType": "GHES license base64 (part 2 of 2)"
+      },
+      "dependsOn": [
+        "keyVault"
+      ]
+    },
+    "ghesTemplateSpec": {
+      "type": "Microsoft.Resources/templateSpecs",
+      "apiVersion": "2022-02-01",
+      "name": "[variables('ghesSpecName')]",
+      "location": "[variables('Location')]",
+      "properties": {
+        "displayName": "GitHub Enterprise Server on Azure Local",
+        "description": "Self-published GHES infrastructure template used by the Workload Orchestration solution."
+      }
+    },
+    "ghesTemplateSpecVersion": {
+      "type": "Microsoft.Resources/templateSpecs/versions",
+      "apiVersion": "2022-02-01",
+      "name": "[format('{0}/{1}', variables('ghesSpecName'), variables('ghesSpecVersion'))]",
+      "location": "[variables('Location')]",
+      "properties": {
+        "description": "GHES image, logical network, VM, and post-configuration resources.",
+        "mainTemplate": "[variables('ghesTemplate')]"
+      },
+      "dependsOn": [
+        "ghesTemplateSpec"
+      ]
+    },
+    "newContext": {
+      "condition": "[variables('createContext')]",
+      "type": "Microsoft.Edge/contexts",
+      "apiVersion": "2026-03-01",
+      "name": "[variables('contextName')]",
+      "location": "[variables('Location')]",
+      "properties": {
+        "capabilities": [
+          {
+            "name": "[variables('infraCapabilityName')]",
+            "description": "Capability used by the GHES deployment.",
+            "state": "active"
+          }
+        ],
+        "hierarchies": [
+          {
+            "name": "[variables('contextHierarchyName')]",
+            "description": "Hierarchy used by the GHES cloud target."
+          }
+        ]
+      }
+    },
+    "existingContext": {
+      "condition": "[not(variables('createContext'))]",
+      "existing": true,
+      "type": "Microsoft.Edge/contexts",
+      "apiVersion": "2026-03-01",
+      "subscriptionId": "[variables('existingContextSubscriptionId')]",
+      "resourceGroup": "[variables('existingContextResourceGroup')]",
+      "name": "[variables('existingContextName')]"
+    },
+    "cloudTarget": {
+      "type": "Microsoft.Edge/targets",
+      "apiVersion": "2026-05-01-preview",
+      "name": "[variables('cloudTargetName')]",
+      "location": "[variables('Location')]",
+      "properties": {
+        "capabilities": [
+          "[variables('infraCapabilityName')]"
+        ],
+        "contextId": "[variables('effectiveContextId')]",
+        "description": "Cloud target for ARM template infrastructure deployment",
+        "displayName": "Cloud Infrastructure Target",
+        "hierarchyLevel": "[variables('contextHierarchyName')]"
+      },
+      "dependsOn": [
+        "newContext",
+        "updateExistingContext"
+      ]
+    },
+    "ghesSolutionTemplate": {
+      "type": "Microsoft.Edge/solutionTemplates",
+      "apiVersion": "2026-03-01",
+      "name": "[variables('ghesSolutionTemplateName')]",
+      "location": "[variables('Location')]",
+      "properties": {
+        "description": "GHES solution template with ARM-resolved Key Vault password references.",
+        "capabilities": [
+          "[variables('infraCapabilityName')]"
+        ]
+      }
+    },
+    "ghesDeployment": {
+      "type": "Microsoft.Edge/solutionDeployments",
+      "apiVersion": "2026-05-01-preview",
+      "name": "ghesDeployment",
+      "location": "[variables('Location')]",
+      "properties": {
+        "solutionTemplateProperties": {
+          "name": "[variables('ghesSolutionTemplateName')]",
+          "version": "[variables('ghesSolutionTemplateVersionName')]"
+        },
+        "targetProperties": {
+          "targetIds": [
+            "[resourceId('Microsoft.Edge/targets', variables('cloudTargetName'))]"
+          ]
+        }
+      },
+      "dependsOn": [
+        "cloudTarget",
+        "ghesSolutionTemplate::solutionVersion"
+      ]
+    },
+    "updateExistingContext": {
+      "condition": "[not(variables('createContext'))]",
+      "type": "Microsoft.Resources/deployments",
+      "apiVersion": "2025-04-01",
+      "name": "[format('updateExistingContext-{0}', uniqueString('updateExistingContext', deployment().name))]",
+      "subscriptionId": "[variables('existingContextSubscriptionId')]",
+      "resourceGroup": "[variables('existingContextResourceGroup')]",
+      "properties": {
+        "expressionEvaluationOptions": {
+          "scope": "inner"
+        },
+        "mode": "Incremental",
+        "parameters": {
+          "contextName": {
+            "value": "[variables('existingContextName')]"
+          },
+          "location": "[if(variables('createContext'), createObject('value', variables('Location')), createObject('value', reference('existingContext', '2026-03-01', 'full').location))]",
+          "tags": "[if(variables('createContext'), createObject('value', createObject()), createObject('value', coalesce(reference('existingContext', '2026-03-01', 'full').tags, createObject())))]",
+          "capabilities": "[if(contains(map(if(variables('createContext'), createArray(), reference('existingContext').capabilities), lambda('capability', lambdaVariables('capability').name)), variables('infraCapabilityName')), if(variables('createContext'), createObject('value', createArray()), createObject('value', reference('existingContext').capabilities)), createObject('value', concat(if(variables('createContext'), createArray(), reference('existingContext').capabilities), createArray(createObject('name', variables('infraCapabilityName'), 'description', 'Capability used by the GHES deployment.', 'state', 'active')))))]",
+          "hierarchies": "[if(variables('createContext'), createObject('value', createArray()), createObject('value', reference('existingContext').hierarchies))]"
+        },
+        "template": {
+          "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+          "contentVersion": "1.0.0.0",
+          "metadata": {
+            "_generator": {
+              "name": "bicep",
+              "version": "0.48.1.52935",
+              "templateHash": "2554515062378064850"
+            }
+          },
+          "parameters": {
+            "contextName": {
+              "type": "string"
+            },
+            "location": {
+              "type": "string"
+            },
+            "tags": {
+              "type": "object"
+            },
+            "capabilities": {
+              "type": "array"
+            },
+            "hierarchies": {
+              "type": "array"
+            }
+          },
+          "resources": [
+            {
+              "type": "Microsoft.Edge/contexts",
+              "apiVersion": "2026-03-01",
+              "name": "[parameters('contextName')]",
+              "location": "[parameters('location')]",
+              "tags": "[parameters('tags')]",
+              "properties": {
+                "capabilities": "[parameters('capabilities')]",
+                "hierarchies": "[parameters('hierarchies')]"
+              }
+            }
+          ]
+        }
+      },
+      "dependsOn": [
+        "existingContext"
+      ]
+    }
+  },
+  "outputs": {
+    "keyVaultResourceId": {
+      "type": "string",
+      "metadata": {
+        "description": "Resource ID of the Key Vault containing the GHES passwords."
+      },
+      "value": "[resourceId('Microsoft.KeyVault/vaults', parameters('KeyVaultName'))]"
+    },
+    "keyVaultUri": {
+      "type": "string",
+      "metadata": {
+        "description": "URI of the Key Vault containing the GHES passwords."
+      },
+      "value": "[reference('keyVault').vaultUri]"
+    },
+    "templateSpecVersionId": {
+      "type": "string",
+      "metadata": {
+        "description": "Resource ID of the GHES Template Spec version created by this deployment."
+      },
+      "value": "[resourceId('Microsoft.Resources/templateSpecs/versions', variables('ghesSpecName'), variables('ghesSpecVersion'))]"
+    },
+    "solutionDeploymentId": {
+      "type": "string",
+      "metadata": {
+        "description": "Resource ID of the Workload Orchestration Solution Deployment."
+      },
+      "value": "[resourceId('Microsoft.Edge/solutionDeployments', 'ghesDeployment')]"
+    },
+    "contextResourceId": {
+      "type": "string",
+      "metadata": {
+        "description": "Resource ID of the Microsoft.Edge context used by the cloud target."
+      },
+      "value": "[variables('effectiveContextId')]"
+    }
+  }
+}

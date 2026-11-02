@@ -74,28 +74,28 @@ param localAdminPasswordSecretName string = 'cloudcasa-local-admin-password'
 param createAcrPullRoleAssignment bool = true
 
 @description('Subscription containing the customer Azure Container Registry.')
-param acrSubscriptionId string
+param acrSubscriptionId string = subscription().subscriptionId
 
 @description('Resource group containing the customer Azure Container Registry.')
-param acrResourceGroupName string
+param acrResourceGroupName string = ''
 
 @description('Name of the customer Azure Container Registry.')
-param acrName string
+param acrName string = ''
 
 @description('OCI repository containing the CloudCasa bootstrap chart.')
 param bootstrapChartRepository string = 'oci://${acrName}.azurecr.io/helm/cloudcasa-bootstrap'
 
-@description('CloudCasa bootstrap chart version.')
+@description('CloudCasa bootstrap chart version.')]
 param bootstrapChartVersion string = '0.2.4'
+
+@description('Immutable bootstrap solution-template version.')
+param bootstrapSolutionTemplateVersion string = '1.1.4'
 
 @description('Bootstrap Helm release name.')
 param bootstrapReleaseName string = 'cloudcasa-bootstrap'
 
 @description('Bootstrap solution-template name.')
 param bootstrapSolutionTemplateName string = 'cloudcasa-bootstrap'
-
-@description('Immutable bootstrap solution-template version.')
-param bootstrapSolutionTemplateVersion string = '1.1.4'
 
 @description('Bootstrap solution-deployment name.')
 param bootstrapSolutionDeploymentName string = 'cloudcasa-bootstrap'
@@ -128,7 +128,7 @@ param releaseName string = 'cloudcasa-server'
 param solutionTemplateName string = 'cloudcasa-server'
 
 @description('Immutable CloudCasa solution template version.')
-param solutionTemplateVersion string = '2.0.7'
+param solutionTemplateVersion string = '2.0.8'
 
 @description('CloudCasa solution deployment name.')
 param solutionDeploymentName string = 'cloudcasa-server'
@@ -145,7 +145,7 @@ param serverNamespace string = 'cloudcasa-server'
 @description('CloudCasa license Secret name.')
 param licenseSecretName string = 'cc-user-license-key'
 
-@description('Dynamic Kubernetes storage class used by CloudCasa.')
+@description('Dynamic Kubernetes storage class used by CloudCasa. The value is normalized to lowercase for Kubernetes RFC 1123 compatibility.')
 param storageClassName string = 'default'
 
 @description('Kubernetes Service type used for the CloudCasa endpoint.')
@@ -162,10 +162,10 @@ param serviceType string = 'LoadBalancer'
 param loadBalancerIdleTimeoutMinutes int = 100
 
 @description('Azure public IP DNS label for a LoadBalancer service.')
-param loadBalancerDnsLabelName string = toLower('${connectClusterName}-${uniqueString(subscription().id, resourceGroup().id)}')
+param loadBalancerDnsLabelName string = toLower('${connectClusterName}-cloudcasa')
 
-@description('Optional public DNS name for the CloudCasa Envoy endpoint. Leave blank to use the Azure LoadBalancer hostname.')
-param cloudCasaFqdn string = ''
+@description('Public DNS name for the CloudCasa Envoy endpoint.')
+param cloudCasaFqdn string = '${loadBalancerDnsLabelName}.${location}.cloudapp.azure.com'
 
 @description('cert-manager Issuer or ClusterIssuer name.')
 param certificateIssuerName string = 'cloudcasa-selfsigned-issuer'
@@ -231,7 +231,7 @@ var workloadOrchestrationCustomLocationNamespace = 'workloadorchestrationresourc
 var workloadOrchestrationExtensionType = 'microsoft.workloadorchestration'
 var workloadOrchestrationReleaseTrain = 'stable'
 var workloadOrchestrationExtensionVersion = '2.1.43'
-var workloadOrchestrationRedisStorageClass = storageClassName
+var workloadOrchestrationRedisStorageClass = 'default'
 var workloadOrchestrationRedisStorageSize = '20Gi'
 var keyVaultReaderRoleDefinitionId = subscriptionResourceId(
   'Microsoft.Authorization/roleDefinitions',
@@ -307,10 +307,7 @@ var baseAuthConfiguration = {
 var effectiveLocalAuthenticationSecretName = localAuthenticationEnabled
   ? '${localAuthenticationSecretName}-${localAuthenticationRevision}'
   : localAuthenticationSecretName
-
-var effectiveCloudCasaFqdn = empty(cloudCasaFqdn)
-  ? '${loadBalancerDnsLabelName}.${location}.cloudapp.azure.com'
-  : cloudCasaFqdn
+var effectiveStorageClassName = toLower(storageClassName)
 
 var authConfiguration = localAuthenticationEnabled
   ? union(baseAuthConfiguration, {
@@ -350,8 +347,8 @@ var solutionTemplateInputFingerprint = uniqueString(string({
   }
   configuration: {
     imagePullSecretName: imagePullSecretName
-    storageClassName: storageClassName
-    cloudCasaFqdn: effectiveCloudCasaFqdn
+    storageClassName: effectiveStorageClassName
+    cloudCasaFqdn: cloudCasaFqdn
     serviceType: serviceType
     serviceAnnotations: serviceAnnotations
     certificateIssuerName: certificateIssuerName
@@ -790,7 +787,7 @@ resource cloudCasaTemplate 'Microsoft.Edge/solutionTemplates@2026-05-01-preview'
       configurations: {
         configs: {
           imagePullSecretName: imagePullSecretName
-          storageClassName: storageClassName
+          storageClassName: effectiveStorageClassName
           license: {
             createSecret: false
           }
@@ -800,7 +797,7 @@ resource cloudCasaTemplate 'Microsoft.Edge/solutionTemplates@2026-05-01-preview'
           serviceAnnotations: serviceAnnotations
           localAuthenticationEnabled: localAuthenticationEnabled
           localAuthenticationSecretName: effectiveLocalAuthenticationSecretName
-          amdsEnvoyUrl: effectiveCloudCasaFqdn
+          amdsEnvoyUrl: cloudCasaFqdn
           amdsEnvoyPort: 443
           amdsEnvoyPortName: 'grpc-port'
           certificates: {
@@ -878,4 +875,4 @@ output bootstrapDeploymentId string = bootstrapDeployment.id
 output cloudCasaDeploymentId string = cloudCasaDeployment.id
 output solutionTemplateInputFingerprint string = solutionTemplateInputFingerprint
 output effectiveLocalAuthenticationSecretName string = effectiveLocalAuthenticationSecretName
-output configuredCloudCasaFqdn string = effectiveCloudCasaFqdn
+output configuredCloudCasaFqdn string = cloudCasaFqdn

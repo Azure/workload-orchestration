@@ -45,13 +45,40 @@ RBAC, audit, and encryption-at-rest controls therefore still apply to those loca
 
 - Kubernetes 1.27 or later.
 - An OIDC issuer for Kubernetes service-account tokens.
+- An existing Workload Orchestration context resource ID when the subscription already has one.
 - The deployment identity can create role assignments on the Key Vault and, when enabled, ACR.
 - The customer ACR contains:
   - `helm/cloudcasa-bootstrap:0.2.4`
-  - `helm/cloudcasa-server:<configured-version>`
+  - `helm/cloudcasa-server:2.0.0-wo.4`
 
 Each cluster-specific parameter file supplies `acrSubscriptionId`, `acrResourceGroupName`, and
 `acrName`. `main.bicep` derives both OCI chart repository URLs from `acrName`.
+
+Check for an existing Workload Orchestration context before deployment:
+
+```powershell
+az resource list `
+  --subscription "<subscription-id>" `
+  --resource-type "Microsoft.Edge/contexts" `
+  --query "[].{name:name,resourceGroup:resourceGroup,id:id}" `
+  --output table
+```
+
+When a context is returned, set:
+
+```bicep
+param contextId = '<existing-context-resource-id>'
+```
+
+Only when the command returns no context, set:
+
+```bicep
+param contextId = ''
+```
+
+An empty or omitted `contextId` tells `main.bicep` to create a context in the deployment resource
+group. Supplying the existing resource ID prevents a second-context creation from failing with
+`ContextAlreadyExists`.
 
 For an Azure AKS cluster, retrieve the issuer with:
 
@@ -68,7 +95,8 @@ Set `location` to the Arc/AKS cluster region. ARM requires resource locations to
 deployment, so this cannot be derived from the existing Arc resource inside the same template.
 The default `storageClassName` is `default`, and the same StorageClass is used by CloudCasa and
 the Workload Orchestration Redis dependency. Override it only when the target cluster does not
-provide a dynamic StorageClass with that name.
+provide a dynamic StorageClass with that name. Kubernetes StorageClass names must be lowercase;
+`main.bicep` normalizes the supplied value to lowercase before passing it to Helm.
 
 For a non-AKS Arc-connected cluster, follow the Azure Arc workload identity federation procedure,
 including configuring the Kubernetes API server to issue tokens from the Arc OIDC issuer.
@@ -135,7 +163,14 @@ logs, or source control.
 the local credentials change. This creates a new SecretSync destination, so bootstrap readiness
 cannot succeed against a stale password.
 
-## Package the bootstrap chart
+## Publish the required charts
+
+The deployment directory contains the validated packages:
+
+- `cloudcasa-bootstrap-0.2.4.tgz`
+- `cloudcasa-server-2.0.0-wo.4.tgz`
+
+Repackage the bootstrap chart only when its source changes:
 
 ```powershell
 helm lint .\bootstrap-chart `
@@ -146,7 +181,24 @@ helm lint .\bootstrap-chart `
 helm package .\bootstrap-chart --destination .
 ```
 
-Publish `cloudcasa-bootstrap-0.2.4.tgz` to the configured OCI repository before deployment.
+For a new customer ACR, sign in and publish both packages before deployment:
+
+```powershell
+$AcrToken = az acr login `
+  --name "<acr-name>" `
+  --resource-group "<acr-resource-group>" `
+  --subscription "<acr-subscription-id>" `
+  --expose-token `
+  --query accessToken `
+  --output tsv
+
+$AcrToken | helm registry login "<acr-name>.azurecr.io" `
+  --username "00000000-0000-0000-0000-000000000000" `
+  --password-stdin
+
+helm push .\cloudcasa-bootstrap-0.2.4.tgz "oci://<acr-name>.azurecr.io/helm"
+helm push .\cloudcasa-server-2.0.0-wo.4.tgz "oci://<acr-name>.azurecr.io/helm"
+```
 
 ## Validate and deploy
 

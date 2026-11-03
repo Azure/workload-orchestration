@@ -4,8 +4,8 @@ using './main.bicep'
 // Set location as well if the resource group region is not the intended WO region.
 param connectClusterName = '<arc-connected-cluster-name>'
 
-// main.bicep creates the context if not exist, capability, hierarchy, and target by default.
-param contextId = '<context-id>'
+// Leave empty to create a dedicated context, or set an existing context resource ID.
+param contextId = ''
 
 param inferenceoperatorChartRepository = 'mcr.microsoft.com/foundrylocalonazurelocal/helmcharts/helm/inference-operator'
 param inferenceoperatorChartVersion = '0.0.1-prp.3'

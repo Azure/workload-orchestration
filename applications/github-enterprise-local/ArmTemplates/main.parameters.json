@@ -44,7 +44,7 @@
     "DiskSizeGB": {
       "value": 500
     },
-    "KeyVaultName": {
+    "KeyVaultResourceId": {
       "value": ""
     },
     "ManagementConsolePassword": {

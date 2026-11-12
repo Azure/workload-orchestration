@@ -44,7 +44,7 @@
     "KeyVaultResourceId": {
       "value": ""
     },
-    "GitHubManagementConsolePassword": {
+    "GithubManagementConsolePassword": {
       "value": ""
     },
     "LicenseBase64": {

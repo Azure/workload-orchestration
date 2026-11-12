@@ -100,7 +100,7 @@
         "description": "Canonical ARM resource ID of an existing RBAC-enabled Key Vault. The vault may be in any resource group or subscription in the same Entra tenant."
       }
     },
-    "GitHubManagementConsolePassword": {
+    "GithubManagementConsolePassword": {
       "type": "securestring",
       "metadata": {
         "description": "GitHub Management Console password."
@@ -141,7 +141,7 @@
         "KeyVaultUri": {
           "type": "string"
         },
-        "GitHubManagementConsolePassword": {
+        "GithubManagementConsolePassword": {
           "type": "securestring"
         },
         "LicenseBase64Part1KeyName": {
@@ -347,7 +347,7 @@
             "protectedParameters": [
               {
                 "name": "GHES_MGMT_PASSWORD",
-                "value": "[[parameters('GitHubManagementConsolePassword')]"
+                "value": "[[parameters('GithubManagementConsolePassword')]"
               }
             ]
           },
@@ -1013,7 +1013,7 @@
             "Location": "[variables('Location')]",
             "VmName": "[parameters('VmName')]",
             "KeyVaultUri": "[reference('keyVault').vaultUri]",
-            "GitHubManagementConsolePassword": "[parameters('GitHubManagementConsolePassword')]",
+            "GithubManagementConsolePassword": "[parameters('GithubManagementConsolePassword')]",
             "LicenseBase64Part1KeyName": "[variables('LicensePart1SecretName')]",
             "LicenseBase64Part2KeyName": "[variables('LicensePart2SecretName')]",
             "GithubHostName": "[if(not(empty(variables('GithubHostName'))), variables('GithubHostName'), format('{0}.{1}', variables('GithubHostLabel'), reference('clusterDeploymentSettings').deploymentConfiguration.scaleUnits[0].deploymentData.domainFqdn))]",
@@ -1272,7 +1272,7 @@
             "value": "[parameters('AdminPassword')]"
           },
           "managementConsolePassword": {
-            "value": "[parameters('GitHubManagementConsolePassword')]"
+            "value": "[parameters('GithubManagementConsolePassword')]"
           },
           "licenseBase64": {
             "value": "[parameters('LicenseBase64')]"

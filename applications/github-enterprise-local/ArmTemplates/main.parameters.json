@@ -38,16 +38,13 @@
     "Memory": {
       "value": 32768
     },
-    "NumberDataDisks": {
-      "value": 1
-    },
     "DiskSizeGB": {
       "value": 500
     },
     "KeyVaultResourceId": {
       "value": ""
     },
-    "ManagementConsolePassword": {
+    "GitHubManagementConsolePassword": {
       "value": ""
     },
     "LicenseBase64": {

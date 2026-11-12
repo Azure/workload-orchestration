@@ -86,13 +86,6 @@
         "description": "Memory assigned to the VM in MB. Supported range: 32768-131072 MB."
       }
     },
-    "NumberDataDisks": {
-      "type": "int",
-      "minValue": 1,
-      "metadata": {
-        "description": "Number of data disks to create and attach. Default: 1"
-      }
-    },
     "DiskSizeGB": {
       "type": "int",
       "minValue": 500,
@@ -107,10 +100,10 @@
         "description": "Canonical ARM resource ID of an existing RBAC-enabled Key Vault. The vault may be in any resource group or subscription in the same Entra tenant."
       }
     },
-    "ManagementConsolePassword": {
+    "GitHubManagementConsolePassword": {
       "type": "securestring",
       "metadata": {
-        "description": "Management-console password."
+        "description": "GitHub Management Console password."
       }
     },
     "LicenseBase64": {
@@ -148,7 +141,7 @@
         "KeyVaultUri": {
           "type": "string"
         },
-        "ManagementConsolePassword": {
+        "GitHubManagementConsolePassword": {
           "type": "securestring"
         },
         "LicenseBase64Part1KeyName": {
@@ -354,7 +347,7 @@
             "protectedParameters": [
               {
                 "name": "GHES_MGMT_PASSWORD",
-                "value": "[[parameters('ManagementConsolePassword')]"
+                "value": "[[parameters('GitHubManagementConsolePassword')]"
               }
             ]
           },
@@ -580,14 +573,6 @@
             "description": "Memory to assign to the VM, in MB."
           }
         },
-        "NumberDataDisks": {
-          "type": "int",
-          "defaultValue": 1,
-          "minValue": 0,
-          "metadata": {
-            "description": "Number of data disks to create and attach."
-          }
-        },
         "DiskSizeGB": {
           "type": "int",
           "defaultValue": 500,
@@ -675,11 +660,11 @@
         {
           "[string('copy')]": {
             "name": "dataDisks",
-            "count": "[[length(range(0, parameters('NumberDataDisks')))]"
+            "count": 1
           },
           "type": "Microsoft.AzureStackHCI/virtualHardDisks",
           "apiVersion": "2025-04-01-preview",
-          "name": "[[format('{0}-datadisk{1}', variables('effectiveVmName'), range(0, parameters('NumberDataDisks'))[copyIndex()])]",
+          "name": "[[format('{0}-datadisk{1}', variables('effectiveVmName'), copyIndex())]",
           "location": "[[parameters('Location')]",
           "extendedLocation": {
             "type": "CustomLocation",
@@ -761,9 +746,6 @@
               "Memory": {
                 "value": "[[parameters('Memory')]"
               },
-              "NumberDataDisks": {
-                "value": "[[parameters('NumberDataDisks')]"
-              },
               "DiskSizeGB": {
                 "value": "[[parameters('DiskSizeGB')]"
               },
@@ -807,9 +789,6 @@
                 "Memory": {
                   "type": "int"
                 },
-                "NumberDataDisks": {
-                  "type": "int"
-                },
                 "DiskSizeGB": {
                   "type": "int"
                 }
@@ -848,9 +827,9 @@
                       "[string('copy')]": [
                         {
                           "name": "dataDisks",
-                          "count": "[[length(range(0, parameters('NumberDataDisks')))]",
+                          "count": 1,
                           "input": {
-                            "id": "[[resourceId('Microsoft.AzureStackHCI/virtualHardDisks', format('{0}-datadisk{1}', parameters('VmName'), range(0, parameters('NumberDataDisks'))[copyIndex('dataDisks')]))]"
+                            "id": "[[resourceId('Microsoft.AzureStackHCI/virtualHardDisks', format('{0}-datadisk{1}', parameters('VmName'), copyIndex('dataDisks')))]"
                           }
                         }
                       ],
@@ -995,7 +974,6 @@
             "AdminPasswordKeyName": "[variables('AdminPasswordSecretName')]",
             "CPU": "[parameters('CPU')]",
             "Memory": "[parameters('Memory')]",
-            "NumberDataDisks": "[parameters('NumberDataDisks')]",
             "DiskSizeGB": "[parameters('DiskSizeGB')]"
           }
         },
@@ -1035,7 +1013,7 @@
             "Location": "[variables('Location')]",
             "VmName": "[parameters('VmName')]",
             "KeyVaultUri": "[reference('keyVault').vaultUri]",
-            "ManagementConsolePassword": "[parameters('ManagementConsolePassword')]",
+            "GitHubManagementConsolePassword": "[parameters('GitHubManagementConsolePassword')]",
             "LicenseBase64Part1KeyName": "[variables('LicensePart1SecretName')]",
             "LicenseBase64Part2KeyName": "[variables('LicensePart2SecretName')]",
             "GithubHostName": "[if(not(empty(variables('GithubHostName'))), variables('GithubHostName'), format('{0}.{1}', variables('GithubHostLabel'), reference('clusterDeploymentSettings').deploymentConfiguration.scaleUnits[0].deploymentData.domainFqdn))]",
@@ -1294,7 +1272,7 @@
             "value": "[parameters('AdminPassword')]"
           },
           "managementConsolePassword": {
-            "value": "[parameters('ManagementConsolePassword')]"
+            "value": "[parameters('GitHubManagementConsolePassword')]"
           },
           "licenseBase64": {
             "value": "[parameters('LicenseBase64')]"

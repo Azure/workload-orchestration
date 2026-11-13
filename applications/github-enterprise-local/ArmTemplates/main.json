@@ -6,14 +6,14 @@
     "_generator": {
       "name": "bicep",
       "version": "0.48.1.52935",
-      "templateHash": "2703359696379775953"
+      "templateHash": "10265839267620064316"
     }
   },
   "parameters": {
     "clusterName": {
       "type": "string",
       "metadata": {
-        "description": "Azure Local cluster name; unlocks auto-resolution of networking and infrastructure values."
+        "description": "Azure Local cluster name"
       }
     },
     "LocalSharePath": {
@@ -30,7 +30,6 @@
     },
     "LogicalNetworkName": {
       "type": "string",
-      "defaultValue": "ghes-lnet",
       "metadata": {
         "description": "Name of the logical network resource."
       }
@@ -62,79 +61,314 @@
     "AdminPassword": {
       "type": "securestring",
       "metadata": {
-        "description": "Administrator password stored in Key Vault. Workload Orchestration receives only a secret reference."
+        "description": "Administrator password."
       }
     },
     "CPU": {
       "type": "int",
-      "defaultValue": 16,
+      "allowedValues": [
+        4,
+        8,
+        16,
+        32
+      ],
       "minValue": 4,
       "maxValue": 32,
       "metadata": {
-        "description": "Number of virtual processors assigned to the VM. Enter a value from 4 to 32 vCPUs."
+        "description": "Number of virtual processors assigned to the VM. Input values: 4, 8, 16 or 32 vCPUs."
       }
     },
     "Memory": {
       "type": "int",
-      "defaultValue": 32768,
       "minValue": 32768,
       "maxValue": 131072,
       "metadata": {
-        "description": "Memory assigned to the VM in MB. Enter a value from 32768 MB (32 GB) to 131072 MB (128 GB)."
-      }
-    },
-    "NumberDataDisks": {
-      "type": "int",
-      "defaultValue": 1,
-      "minValue": 0,
-      "metadata": {
-        "description": "Number of data disks to create and attach."
+        "description": "Memory assigned to the VM in MB. Supported range: 32768-131072 MB."
       }
     },
     "DiskSizeGB": {
       "type": "int",
-      "defaultValue": 500,
+      "minValue": 500,
       "metadata": {
-        "description": "Size of each data disk in GB."
+        "description": "Size of each data disk in GB. Minimum value is 500"
       }
     },
-    "KeyVaultName": {
+    "KeyVaultResourceId": {
       "type": "string",
-      "minLength": 3,
-      "maxLength": 24,
+      "minLength": 80,
       "metadata": {
-        "description": "Globally unique Key Vault name (3-24 characters, alphanumeric and dashes)."
+        "description": "Canonical ARM resource ID of an existing RBAC-enabled Key Vault. The vault may be in any resource group or subscription in the same Entra tenant."
       }
     },
-    "ManagementConsolePassword": {
+    "GithubManagementConsolePassword": {
       "type": "securestring",
       "metadata": {
-        "description": "GHES management-console password stored in Key Vault. Workload Orchestration receives only a secret reference."
+        "description": "GitHub Management Console password."
       }
     },
     "LicenseBase64": {
       "type": "securestring",
       "metadata": {
-        "description": "Base64-encoded GHES license file. Stored across two Key Vault secrets because a real .ghl base64 (~27 KB) exceeds Key Vault's 25,600-char secret value limit."
+        "description": "Base64-encoded GHES .ghl license file."
       }
     },
     "existingContextId": {
       "type": "string",
       "defaultValue": "",
       "metadata": {
-        "description": "Existing tenant Workload Orchestration context resource ID. Leave empty only when the tenant has no context."
+        "description": "Leave blank if tenant has no context."
       }
     }
   },
   "variables": {
+    "$fxv#0": {
+      "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+      "contentVersion": "1.0.0.0",
+      "metadata": {
+        "_generator": {
+          "name": "bicep",
+          "version": "0.48.1.52935",
+          "templateHash": "13898011410630063581"
+        }
+      },
+      "parameters": {
+        "Location": {
+          "type": "string"
+        },
+        "VmName": {
+          "type": "string"
+        },
+        "KeyVaultUri": {
+          "type": "string"
+        },
+        "GithubManagementConsolePassword": {
+          "type": "securestring"
+        },
+        "LicenseBase64Part1KeyName": {
+          "type": "string"
+        },
+        "LicenseBase64Part2KeyName": {
+          "type": "string"
+        },
+        "GithubHostName": {
+          "type": "string"
+        },
+        "SubdomainIsolation": {
+          "type": "bool",
+          "defaultValue": true
+        },
+        "SignupEnabled": {
+          "type": "bool",
+          "defaultValue": false
+        },
+        "PublicPages": {
+          "type": "bool",
+          "defaultValue": false
+        },
+        "ManagePort": {
+          "type": "int",
+          "defaultValue": 8443
+        },
+        "ApplyTimeoutMinutes": {
+          "type": "int",
+          "defaultValue": 180
+        },
+        "ReadyTimeoutMinutes": {
+          "type": "int",
+          "defaultValue": 30
+        },
+        "SkipApply": {
+          "type": "bool",
+          "defaultValue": false
+        },
+        "AsyncExecution": {
+          "type": "bool",
+          "defaultValue": true
+        },
+        "RunCommandName": {
+          "type": "string",
+          "defaultValue": "ghes-postconfig"
+        },
+        "internalBaseTimestamp": {
+          "type": "string",
+          "defaultValue": "[[utcNow()]"
+        }
+      },
+      "variables": {
+        "$fxv#0": "#!/usr/bin/env bash\nset -uo pipefail\numask 077\n\nGHES_HOSTNAME=\"${GHES_HOSTNAME:-}\"\nGHES_MGMT_PASSWORD=\"${GHES_MGMT_PASSWORD:-}\"\nGHES_KEYVAULT_URI=\"${GHES_KEYVAULT_URI:-}\"\nGHES_LICENSE_PART1_SECRET_NAME=\"${GHES_LICENSE_PART1_SECRET_NAME:-}\"\nGHES_LICENSE_PART2_SECRET_NAME=\"${GHES_LICENSE_PART2_SECRET_NAME:-}\"\n\nGHES_SUBDOMAIN_ISOLATION=\"${GHES_SUBDOMAIN_ISOLATION:-true}\"\nGHES_SIGNUP_ENABLED=\"${GHES_SIGNUP_ENABLED:-false}\"\nGHES_PUBLIC_PAGES=\"${GHES_PUBLIC_PAGES:-false}\"\n\nGHES_MANAGE_PORT=\"${GHES_MANAGE_PORT:-8443}\"\nGHES_APPLY_TIMEOUT_MIN=\"${GHES_APPLY_TIMEOUT_MIN:-120}\"\nGHES_READY_TIMEOUT_MIN=\"${GHES_READY_TIMEOUT_MIN:-30}\"\n\nGHES_SKIP_APPLY=\"${GHES_SKIP_APPLY:-false}\"\nGHES_VERIFY=\"${GHES_VERIFY:-true}\"\nGHES_VERIFY_STRICT=\"${GHES_VERIFY_STRICT:-false}\"\n\nLIC_FILE=\"$(mktemp /tmp/ghes-license.XXXXXX.ghl)\"\nPW_FILE=\"$(mktemp /tmp/ghes-pw.XXXXXX)\"\nINIT_OUT=\"$(mktemp /tmp/ghes-init.XXXXXX.out)\"\nLEGACY_INIT_OUT=\"$(mktemp /tmp/ghes-legacy-init.XXXXXX.out)\"\nSETTINGS_OUT=\"$(mktemp /tmp/ghes-settings.XXXXXX.out)\"\nHIMDS_HEADERS=\"$(mktemp /tmp/ghes-himds-headers.XXXXXX.out)\"\nTOKEN_OUT=\"$(mktemp /tmp/ghes-token.XXXXXX.json)\"\nSECRET1_OUT=\"$(mktemp /tmp/ghes-secret1.XXXXXX.json)\"\nSECRET2_OUT=\"$(mktemp /tmp/ghes-secret2.XXXXXX.json)\"\n\nHIMDS_ENDPOINT=\"http://127.0.0.1:40342/metadata/identity/oauth2/token\"\nKEYVAULT_RESOURCE=\"https://vault.azure.net\"\nHIMDS_API_VERSION=\"2020-06-01\"\nKEYVAULT_API_VERSION=\"7.4\"\nACCESS_TOKEN=\"\"\nHIMDS_CHALLENGE=\"\"\nLICENSE_PART1=\"\"\nLICENSE_PART2=\"\"\n\nlog() {\n    printf '%s [post-config] %s\\n' \\\n        \"$(date -u +%Y-%m-%dT%H:%M:%SZ)\" \"$*\"\n}\n\nsecure_remove() {\n    local path=\"$1\"\n\n    if command -v shred >/dev/null 2>&1; then\n        shred -u \"$path\" 2>/dev/null || rm -f \"$path\"\n    else\n        rm -f \"$path\"\n    fi\n}\n\ncleanup() {\n    secure_remove \"$LIC_FILE\"\n    secure_remove \"$PW_FILE\"\n    secure_remove \"$INIT_OUT\"\n    secure_remove \"$LEGACY_INIT_OUT\"\n    secure_remove \"$SETTINGS_OUT\"\n    secure_remove \"$HIMDS_HEADERS\"\n    secure_remove \"$TOKEN_OUT\"\n    secure_remove \"$SECRET1_OUT\"\n    secure_remove \"$SECRET2_OUT\"\n    unset ACCESS_TOKEN HIMDS_CHALLENGE LICENSE_PART1 LICENSE_PART2\n}\n\ndie() {\n    log \"ERROR: $*\"\n    cleanup\n    exit 1\n}\n\ntrap cleanup EXIT\n\nlc() {\n    printf '%s' \"$1\" | tr '[:upper:]' '[:lower:]'\n}\n\nresponse_diagnostic() {\n    local path=\"$1\"\n\n    [[ -s \"$path\" ]] || {\n        printf '%s' '<empty>'\n        return\n    }\n\n    awk -v password_file=\"$PW_FILE\" '\n        BEGIN {\n            if ((getline password < password_file) < 0) {\n                password = \"\"\n            }\n            close(password_file)\n            limit = 1000\n            emitted = 0\n        }\n\n        function redact_literal(text, secret, replacement, pos) {\n            if (secret == \"\") {\n                return text\n            }\n\n            while ((pos = index(text, secret)) > 0) {\n                text = substr(text, 1, pos - 1) replacement substr(text, pos + length(secret))\n            }\n\n            return text\n        }\n\n        function redact_url_queries(text, output, token, query_pos) {\n            output = \"\"\n\n            while (match(text, /https?:\\/\\/[^[:space:]\"]+\\?[^[:space:]\"]*/)) {\n                token = substr(text, RSTART, RLENGTH)\n                query_pos = index(token, \"?\")\n                output = output substr(text, 1, RSTART - 1) \\\n                    substr(token, 1, query_pos) \"[REDACTED]\"\n                text = substr(text, RSTART + RLENGTH)\n            }\n\n            return output text\n        }\n\n        function redact_sensitive_json_values(text, output, lower, prefix, rest, quote_pos) {\n            output = \"\"\n            lower = tolower(text)\n\n            while (match(lower, /\"(password|license|license_uri|license_url|sas|token)\"[[:space:]]*:[[:space:]]*\"/)) {\n                prefix = substr(text, 1, RSTART + RLENGTH - 1)\n                rest = substr(text, RSTART + RLENGTH)\n                quote_pos = index(rest, \"\\\"\")\n\n                if (quote_pos == 0) {\n                    output = output prefix \"[REDACTED]\"\n                    text = \"\"\n                } else {\n                    output = output prefix \"[REDACTED]\\\"\"\n                    text = substr(rest, quote_pos + 1)\n                }\n\n                lower = tolower(text)\n            }\n\n            return output text\n        }\n\n        {\n            line = $0\n            gsub(/[[:cntrl:]]/, \" \", line)\n            line = redact_literal(line, password, \"[REDACTED]\")\n            line = redact_url_queries(line)\n            line = redact_sensitive_json_values(line)\n            line = line \" \"\n\n            remaining = limit - emitted\n            if (remaining > 0) {\n                printf \"%s\", substr(line, 1, remaining)\n                emitted += length(substr(line, 1, remaining))\n            }\n\n            if (emitted >= limit) {\n                exit\n            }\n        }\n    ' \"$path\"\n}\n\nalready_initialized_response() {\n    local path=\"$1\"\n\n    grep -qiE \\\n        '(already[[:space:]]+(been[[:space:]]+)?initialized|initialization[[:space:]]+already[[:space:]]+(complete|completed)|password[^[:cntrl:]]{0,80}already[[:space:]]+(been[[:space:]]+)?set)' \\\n        \"$path\" 2>/dev/null\n}\n\n# ---------------------------------------------------------------------------\n# Prerequisite validation\n# ---------------------------------------------------------------------------\n\n[[ \"${EUID:-$(id -u)}\" -eq 0 ]] ||\n    die \"must run as root (Arc Linux Run Command runs as root by default).\"\n\ncommand -v curl >/dev/null 2>&1 ||\n    die \"curl not found on the appliance.\"\n\ncommand -v python3 >/dev/null 2>&1 ||\n    die \"python3 not found on the appliance; it is required for safe JSON parsing and URL validation.\"\n\ncommand -v ghe-config-apply >/dev/null 2>&1 ||\n    die \"ghe-config-apply not found - this does not look like a GHES appliance.\"\n\n[[ -n \"$GHES_HOSTNAME\" ]] ||\n    die \"GHES_HOSTNAME is required.\"\n\n[[ -n \"$GHES_MGMT_PASSWORD\" ]] ||\n    die \"GHES_MGMT_PASSWORD is required (protected parameter).\"\n\n[[ -n \"$GHES_KEYVAULT_URI\" ]] ||\n    die \"GHES_KEYVAULT_URI is required.\"\n\n[[ -n \"$GHES_LICENSE_PART1_SECRET_NAME\" ]] ||\n    die \"GHES_LICENSE_PART1_SECRET_NAME is required.\"\n\n[[ -n \"$GHES_LICENSE_PART2_SECRET_NAME\" ]] ||\n    die \"GHES_LICENSE_PART2_SECRET_NAME is required.\"\n\npython3 - \"$GHES_KEYVAULT_URI\" \"$GHES_LICENSE_PART1_SECRET_NAME\" \"$GHES_LICENSE_PART2_SECRET_NAME\" <<'PY' ||\nimport re\nimport sys\nfrom urllib.parse import urlsplit\n\nvault_uri, *secret_names = sys.argv[1:]\nparsed = urlsplit(vault_uri)\ntry:\n    port = parsed.port\nexcept ValueError:\n    raise SystemExit(1)\nif (\n    parsed.scheme != \"https\"\n    or not parsed.hostname\n    or not parsed.hostname.endswith(\".vault.azure.net\")\n    or parsed.username\n    or parsed.password\n    or port not in (None, 443)\n    or parsed.path not in (\"\", \"/\")\n    or parsed.query\n    or parsed.fragment\n):\n    raise SystemExit(1)\nif any(not re.fullmatch(r\"[0-9A-Za-z-]{1,127}\", name) for name in secret_names):\n    raise SystemExit(1)\nPY\n    die \"Key Vault URI or secret name is invalid.\"\n\n# ---------------------------------------------------------------------------\n# Normalize settings\n# ---------------------------------------------------------------------------\n\nSUBDOM=\"$(lc \"$GHES_SUBDOMAIN_ISOLATION\")\"\n[[ \"$SUBDOM\" == \"true\" || \"$SUBDOM\" == \"false\" ]] || SUBDOM=\"true\"\n\nSIGNUP=\"$(lc \"$GHES_SIGNUP_ENABLED\")\"\n[[ \"$SIGNUP\" == \"true\" || \"$SIGNUP\" == \"false\" ]] || SIGNUP=\"false\"\n\nPUBPAGES=\"$(lc \"$GHES_PUBLIC_PAGES\")\"\n[[ \"$PUBPAGES\" == \"true\" || \"$PUBPAGES\" == \"false\" ]] || PUBPAGES=\"false\"\n\nPORT=\"$GHES_MANAGE_PORT\"\nBASE=\"https://127.0.0.1:${PORT}\"\n\nlog \"hostname=${GHES_HOSTNAME} port=${PORT} subdomain_isolation=${SUBDOM} signup_enabled=${SIGNUP} public_pages=${PUBPAGES}\"\n\n# ---------------------------------------------------------------------------\n# Retrieve and reconstruct GHES license\n# ---------------------------------------------------------------------------\n\nget_json_string() {\n    local path=\"$1\"\n    local field=\"$2\"\n\n    python3 - \"$path\" \"$field\" <<'PY'\nimport json\nimport sys\n\npath, field = sys.argv[1:]\ntry:\n    with open(path, \"r\", encoding=\"utf-8\") as handle:\n        payload = json.load(handle)\n    value = payload[field]\nexcept (OSError, UnicodeError, json.JSONDecodeError, KeyError, TypeError):\n    raise SystemExit(1)\nif not isinstance(value, str) or not value:\n    raise SystemExit(1)\nsys.stdout.write(value)\nPY\n}\n\nurlencode_path_segment() {\n    python3 - \"$1\" <<'PY'\nimport sys\nfrom urllib.parse import quote\n\nsys.stdout.write(quote(sys.argv[1], safe=\"\"))\nPY\n}\n\nhimds_status=$(\n    curl \\\n        -sS \\\n        -D \"$HIMDS_HEADERS\" \\\n        -o /dev/null \\\n        -w '%{http_code}' \\\n        --connect-timeout 5 \\\n        --max-time 15 \\\n        -H 'Metadata: true' \\\n        --get \\\n        --data-urlencode \"api-version=${HIMDS_API_VERSION}\" \\\n        --data-urlencode \"resource=${KEYVAULT_RESOURCE}\" \\\n        \"$HIMDS_ENDPOINT\" \\\n        2>/dev/null ||\n        echo 000\n)\nhimds_status=\"${himds_status: -3}\"\n[[ \"$himds_status\" == \"401\" ]] ||\n    die \"Arc HIMDS challenge request failed (HTTP ${himds_status}).\"\n\nchallenge_file=$(\n    python3 - \"$HIMDS_HEADERS\" <<'PY'\nimport re\nimport sys\n\ntry:\n    with open(sys.argv[1], \"r\", encoding=\"iso-8859-1\") as handle:\n        headers = handle.read().splitlines()\nexcept OSError:\n    raise SystemExit(1)\n\nfor header in headers:\n    match = re.match(r\"(?i)^www-authenticate:\\s*Basic\\s+realm=(?:\\\"([^\\\"]+)\\\"|(\\S+))\\s*$\", header)\n    if match:\n        sys.stdout.write(match.group(1) or match.group(2))\n        break\nelse:\n    raise SystemExit(1)\nPY\n) || die \"Arc HIMDS challenge response was missing the challenge-file path.\"\n\n[[ \"$challenge_file\" == /* && -f \"$challenge_file\" && ! -L \"$challenge_file\" ]] ||\n    die \"Arc HIMDS returned an invalid challenge-file path.\"\n\nchallenge_owner=$(stat -c '%U' \"$challenge_file\" 2>/dev/null) ||\n    die \"could not inspect the Arc HIMDS challenge file.\"\nchallenge_group=$(stat -c '%G' \"$challenge_file\" 2>/dev/null) ||\n    die \"could not inspect the Arc HIMDS challenge file.\"\nchallenge_mode=$(stat -c '%a' \"$challenge_file\" 2>/dev/null) ||\n    die \"could not inspect the Arc HIMDS challenge file permissions.\"\n[[ \"$challenge_mode\" =~ ^[0-7]{3,4}$ ]] ||\n    die \"Arc HIMDS challenge file permissions or ownership are unsafe.\"\nchallenge_mode_value=$((8#$challenge_mode))\ncase \"${challenge_owner}:${challenge_group}\" in\n    root:root|root:himds|himds:himds)\n        ;;\n    *)\n        die \"Arc HIMDS challenge file permissions or ownership are unsafe.\"\n        ;;\nesac\n[[ -r \"$challenge_file\" ]] ||\n    die \"Arc HIMDS challenge file permissions or ownership are unsafe.\"\n(( (challenge_mode_value & 0007) == 0 && (challenge_mode_value & 0030) == 0 )) ||\n    die \"Arc HIMDS challenge file permissions or ownership are unsafe.\"\n\nHIMDS_CHALLENGE=$(<\"$challenge_file\") ||\n    die \"could not read the Arc HIMDS challenge file.\"\n[[ -n \"$HIMDS_CHALLENGE\" ]] ||\n    die \"Arc HIMDS challenge file was empty.\"\n\nhimds_status=$(\n    curl \\\n        -sS \\\n        -o \"$TOKEN_OUT\" \\\n        -w '%{http_code}' \\\n        --connect-timeout 5 \\\n        --max-time 30 \\\n        -H 'Metadata: true' \\\n        -H \"Authorization: Basic ${HIMDS_CHALLENGE}\" \\\n        --get \\\n        --data-urlencode \"api-version=${HIMDS_API_VERSION}\" \\\n        --data-urlencode \"resource=${KEYVAULT_RESOURCE}\" \\\n        \"$HIMDS_ENDPOINT\" \\\n        2>/dev/null ||\n        echo 000\n)\nhimds_status=\"${himds_status: -3}\"\nunset HIMDS_CHALLENGE challenge_file challenge_owner challenge_group challenge_mode challenge_mode_value\n[[ \"$himds_status\" == \"200\" ]] ||\n    die \"Arc HIMDS token request failed (HTTP ${himds_status}).\"\n\nACCESS_TOKEN=$(get_json_string \"$TOKEN_OUT\" access_token) ||\n    die \"Arc HIMDS token response was invalid.\"\nsecure_remove \"$TOKEN_OUT\"\n\nfetch_keyvault_secret() {\n    local secret_name=\"$1\"\n    local output_path=\"$2\"\n    local encoded_name\n    local status\n    local attempt\n    local delay=5\n    local max_attempts=6\n\n    encoded_name=$(urlencode_path_segment \"$secret_name\") ||\n        die \"failed to encode a Key Vault secret name.\"\n\n    for ((attempt = 1; attempt <= max_attempts; attempt++)); do\n        : >\"$output_path\"\n        status=$(\n            curl \\\n                -sS \\\n                -o \"$output_path\" \\\n                -w '%{http_code}' \\\n                --connect-timeout 10 \\\n                --max-time 60 \\\n                -H \"Authorization: Bearer ${ACCESS_TOKEN}\" \\\n                --get \\\n                --data-urlencode \"api-version=${KEYVAULT_API_VERSION}\" \\\n                \"${GHES_KEYVAULT_URI%/}/secrets/${encoded_name}\" \\\n                2>/dev/null ||\n                echo 000\n        )\n        status=\"${status: -3}\"\n\n        if [[ \"$status\" == \"200\" ]]; then\n            return 0\n        fi\n\n        if [[ \"$status\" =~ ^(401|403)$ && \"$attempt\" -lt \"$max_attempts\" ]]; then\n            log \"Key Vault authorization is not ready (HTTP ${status}); retrying in ${delay}s (${attempt}/${max_attempts}).\"\n            sleep \"$delay\"\n            delay=$((delay < 40 ? delay * 2 : 60))\n            continue\n        fi\n\n        die \"Key Vault secret retrieval failed (HTTP ${status}, attempt ${attempt}/${max_attempts}); response body suppressed.\"\n    done\n}\n\nfetch_keyvault_secret \"$GHES_LICENSE_PART1_SECRET_NAME\" \"$SECRET1_OUT\"\nfetch_keyvault_secret \"$GHES_LICENSE_PART2_SECRET_NAME\" \"$SECRET2_OUT\"\n\nLICENSE_PART1=$(get_json_string \"$SECRET1_OUT\" value) ||\n    die \"first Key Vault secret response was invalid.\"\nLICENSE_PART2=$(get_json_string \"$SECRET2_OUT\" value) ||\n    die \"second Key Vault secret response was invalid.\"\n\nsecure_remove \"$SECRET1_OUT\"\nsecure_remove \"$SECRET2_OUT\"\nunset ACCESS_TOKEN GHES_LICENSE_PART1_SECRET_NAME GHES_LICENSE_PART2_SECRET_NAME\n\nif ! printf '%s%s' \"$LICENSE_PART1\" \"$LICENSE_PART2\" | base64 -d > \"$LIC_FILE\"; then\n    die \"failed to base64-decode the GHES license.\"\nfi\n\nif [[ ! -s \"$LIC_FILE\" ]]; then\n    die \"decoded GHES license file is empty.\"\nfi\n\nchmod 600 \"$LIC_FILE\"\n\nunset LICENSE_PART1 LICENSE_PART2\n\nprintf '%s' \"$GHES_MGMT_PASSWORD\" >\"$PW_FILE\"\nchmod 600 \"$PW_FILE\"\n\n# ---------------------------------------------------------------------------\n# Authentication helper\n# ---------------------------------------------------------------------------\n\nauth_config() {\n    local esc=${GHES_MGMT_PASSWORD//\\\\/\\\\\\\\}\n    esc=${esc//\\\"/\\\\\\\"}\n\n    printf 'user = \"api_key:%s\"\\n' \"$esc\"\n}\n\nmanage_api_code() {\n    local code\n\n    code=$(\n        auth_config |\n            curl \\\n                -K - \\\n                -k \\\n                -sS \\\n                -o /dev/null \\\n                -w '%{http_code}' \\\n                --connect-timeout 10 \\\n                --max-time 30 \\\n                \"${BASE}/manage/v1/config/settings\" \\\n                2>/dev/null ||\n            echo 000\n    )\n\n    printf '%s' \"${code: -3}\"\n}\n\napply_in_progress() {\n    pgrep -f 'ghe-config-apply' >/dev/null 2>&1\n}\n\n# ---------------------------------------------------------------------------\n# Initialize GHES\n# ---------------------------------------------------------------------------\n\ninit_ghes() {\n    local code\n    local diagnostic\n\n    code=$(manage_api_code)\n    if [[ \"$code\" == \"200\" ]]; then\n        log \"Manage API is already authenticated (HTTP 200); initialization is complete.\"\n        return 0\n    fi\n\n    log \"initializing via ${BASE}/manage/v1/config/init\"\n\n    code=$(\n        curl \\\n            -k \\\n            -sS \\\n            -o \"$INIT_OUT\" \\\n            -w '%{http_code}' \\\n            --connect-timeout 15 \\\n            --max-time 120 \\\n            -X POST \\\n            -F \"license=@${LIC_FILE}\" \\\n            -F \"password=<${PW_FILE}\" \\\n            \"${BASE}/manage/v1/config/init\" \\\n            2>/dev/null ||\n            echo 000\n    )\n    code=\"${code: -3}\"\n\n    case \"$code\" in\n        200|201|202)\n            log \"manage init accepted (HTTP ${code}).\"\n            return 0\n            ;;\n        400)\n            if [[ \"$(manage_api_code)\" == \"200\" ]]; then\n                log \"manage init returned HTTP 400, but authenticated Manage API is now available; initialization is complete.\"\n                return 0\n            fi\n\n            if already_initialized_response \"$INIT_OUT\"; then\n                log \"manage init reports the instance is already initialized; continuing.\"\n                return 0\n            fi\n            ;;\n    esac\n\n    if [[ ! \"$code\" =~ ^(404|405|410)$ ]]; then\n        diagnostic=$(response_diagnostic \"$INIT_OUT\")\n        log \"initialization failed at /manage/v1/config/init (HTTP ${code}); response: ${diagnostic}\"\n        return 1\n    fi\n\n    diagnostic=$(response_diagnostic \"$INIT_OUT\")\n    log \"manage init endpoint unavailable (HTTP ${code}); response: ${diagnostic}; trying legacy /setup/api/start.\"\n\n    code=$(\n        curl \\\n            -k \\\n            -sS \\\n            -o \"$LEGACY_INIT_OUT\" \\\n            -w '%{http_code}' \\\n            --connect-timeout 15 \\\n            --max-time 120 \\\n            -X POST \\\n            -F \"license=@${LIC_FILE}\" \\\n            -F \"password=<${PW_FILE}\" \\\n            \"${BASE}/setup/api/start\" \\\n            2>/dev/null ||\n            echo 000\n    )\n    code=\"${code: -3}\"\n\n    case \"$code\" in\n        200|201|202)\n            log \"legacy init accepted (HTTP ${code}).\"\n            return 0\n            ;;\n        400)\n            if [[ \"$(manage_api_code)\" == \"200\" ]]; then\n                log \"legacy init returned HTTP 400, but authenticated Manage API is now available; initialization is complete.\"\n                return 0\n            fi\n\n            if already_initialized_response \"$LEGACY_INIT_OUT\"; then\n                log \"legacy init reports the instance is already initialized; continuing.\"\n                return 0\n            fi\n            ;;\n    esac\n\n    diagnostic=$(response_diagnostic \"$LEGACY_INIT_OUT\")\n    log \"initialization failed at /setup/api/start (HTTP ${code}); response: ${diagnostic}\"\n    return 1\n}\n\n# ---------------------------------------------------------------------------\n# Wait for Manage API\n# ---------------------------------------------------------------------------\n\nwait_ready() {\n    local deadline\n    local code\n\n    deadline=$(( $(date +%s) + GHES_READY_TIMEOUT_MIN * 60 ))\n\n    log \"waiting up to ${GHES_READY_TIMEOUT_MIN}m for Manage API + initial apply to settle.\"\n\n    while (( $(date +%s) < deadline )); do\n        code=$(manage_api_code)\n\n        if [[ \"$code\" == \"200\" ]] && ! apply_in_progress; then\n            log \"Manage API ready (HTTP 200) and no apply in progress.\"\n            return 0\n        fi\n\n        log \"not ready yet (manage_api=${code}, apply_running=$(apply_in_progress && echo yes || echo no)); retrying in 30s.\"\n        sleep 30\n    done\n\n    return 1\n}\n\n# ---------------------------------------------------------------------------\n# Stage GHES settings\n# ---------------------------------------------------------------------------\n\nstage_settings() {\n    local body\n    local code\n\n    body=$(\n        printf \\\n            '{\"github_hostname\":\"%s\",\"subdomain_isolation\":%s,\"signup_enabled\":%s,\"public_pages\":%s}' \\\n            \"$GHES_HOSTNAME\" \\\n            \"$SUBDOM\" \\\n            \"$SIGNUP\" \\\n            \"$PUBPAGES\"\n    )\n\n    log \"staging settings via PUT ${BASE}/manage/v1/config/settings\"\n\n    code=$(\n        auth_config |\n            curl \\\n                -K - \\\n                -k \\\n                -sS \\\n                -o \"$SETTINGS_OUT\" \\\n                -w '%{http_code}' \\\n                --connect-timeout 15 \\\n                --max-time 120 \\\n                -H 'Content-Type: application/json' \\\n                -X PUT \\\n                --data \"$body\" \\\n                \"${BASE}/manage/v1/config/settings\" \\\n                2>/dev/null ||\n            echo 000\n    )\n\n    if [[ \"$code\" =~ ^2 ]]; then\n        log \"settings staged (HTTP ${code}).\"\n        return 0\n    fi\n\n    die \"settings PUT failed (HTTP ${code}); response body suppressed.\"\n}\n\n# ---------------------------------------------------------------------------\n# Apply GHES configuration\n# ---------------------------------------------------------------------------\n\napply_config() {\n    local logf\n    local rc\n\n    logf=\"/data/user/common/ghe-config-apply.$(date -u +%Y%m%d%H%M%S).log\"\n\n    log \"running ghe-config-apply (timeout ${GHES_APPLY_TIMEOUT_MIN}m); log: ${logf}\"\n\n    if command -v timeout >/dev/null 2>&1; then\n        timeout \"${GHES_APPLY_TIMEOUT_MIN}m\" \\\n            ghe-config-apply >\"$logf\" 2>&1 &&\n            rc=0 ||\n            rc=$?\n    else\n        ghe-config-apply >\"$logf\" 2>&1 &&\n            rc=0 ||\n            rc=$?\n    fi\n\n    log \"ghe-config-apply exit code: ${rc}\"\n    log \"--- last 20 lines of apply log ---\"\n\n    tail -n 20 \"$logf\" 2>/dev/null || true\n\n    log \"----------------------------------\"\n\n    return \"$rc\"\n}\n\n# ---------------------------------------------------------------------------\n# Verify endpoints\n# ---------------------------------------------------------------------------\n\nverify_endpoints() {\n    [[ \"$(lc \"$GHES_VERIFY\")\" == \"true\" ]] || {\n        log \"endpoint self-verify skipped (GHES_VERIFY=false).\"\n        return 0\n    }\n\n    local failures=0\n\n    check_code() {\n        local desc=\"$1\"\n        local url=\"$2\"\n        local expected=\"$3\"\n        local code\n\n        shift 3\n\n        code=$(\n            curl \\\n                -k \\\n                -sS \\\n                -o /dev/null \\\n                -w '%{http_code}' \\\n                --connect-timeout 10 \\\n                --max-time 30 \\\n                \"$@\" \\\n                \"$url\" \\\n                2>/dev/null ||\n                echo 000\n        )\n\n        if [[ \"$code\" =~ ^($expected)$ ]]; then\n            log \"verify PASS: ${desc} (HTTP ${code})\"\n        else\n            log \"verify FAIL: ${desc} (expected ${expected}, got ${code})\"\n            failures=$((failures + 1))\n        fi\n    }\n\n    log \"verifying appliance endpoints (Host: ${GHES_HOSTNAME}).\"\n\n    check_code \\\n        \"web root -> redirect to /login\" \\\n        \"https://127.0.0.1/\" \\\n        '301|302' \\\n        -H \"Host: ${GHES_HOSTNAME}\"\n\n    check_code \\\n        \"login page reachable\" \\\n        \"https://127.0.0.1/login\" \\\n        '200' \\\n        -H \"Host: ${GHES_HOSTNAME}\"\n\n    check_code \\\n        \"manage API requires auth\" \\\n        \"${BASE}/manage/v1/config/apply\" \\\n        '401'\n\n    if (( failures > 0 )); then\n        if [[ \"$(lc \"$GHES_VERIFY_STRICT\")\" == \"true\" ]]; then\n            die \"endpoint self-verify failed (${failures} check(s)) and GHES_VERIFY_STRICT=true.\"\n        fi\n\n        log \"WARNING: endpoint self-verify reported ${failures} failure(s) (non-fatal; set GHES_VERIFY_STRICT=true to fail).\"\n    else\n        log \"endpoint self-verify: all checks passed.\"\n    fi\n}\n\n# ---------------------------------------------------------------------------\n# Main\n# ---------------------------------------------------------------------------\n\ninit_ghes ||\n    die \"GHES first-boot initialization failed.\"\n\nwait_ready ||\n    die \"GHES Manage API did not become ready within ${GHES_READY_TIMEOUT_MIN}m.\"\n\nstage_settings\n\nif [[ \"$(lc \"$GHES_SKIP_APPLY\")\" == \"true\" ]]; then\n    log \"GHES_SKIP_APPLY=true - settings staged but skipping ghe-config-apply.\"\n    log \"post-config completed (staged only).\"\n    exit 0\nfi\n\nif apply_config; then\n    log \"post-config completed successfully.\"\n\n    verify_endpoints\n\n    log \"REMINDER: Active Directory objects, DNS records, and LDAP auth-mode remain MANUAL.\"\n    exit 0\nfi\n\ndie \"ghe-config-apply reported a non-zero exit; see the apply log above.\"",
+        "$fxv#1": "#!/usr/bin/env bash\r\nset -euo pipefail\r\numask 077\r\nscript_file=\"$(mktemp)\"\r\ncleanup() {\r\n  if command -v shred >/dev/null 2>&1; then\r\n    shred -u \"$script_file\" 2>/dev/null || rm -f \"$script_file\"\r\n  else\r\n    rm -f \"$script_file\"\r\n  fi\r\n}\r\ntrap cleanup EXIT\r\nchmod 600 \"$script_file\"\r\nprintf '%s' \"$POST_CONFIG_SCRIPT\" >\"$script_file\"\r\naz storage blob upload \\\r\n  --account-name \"$STORAGE_ACCOUNT_NAME\" \\\r\n  --auth-mode key \\\r\n  --container-name \"$ASSET_CONTAINER_NAME\" \\\r\n  --name \"$SCRIPT_BLOB_NAME\" \\\r\n  --file \"$script_file\" \\\r\n  --overwrite true \\\r\n  --only-show-errors\r\n",
+        "scriptStorageAccountName": "[[toLower(format('ghes{0}', take(uniqueString(subscription().id, resourceGroup().id, parameters('VmName')), 20)))]",
+        "scriptContainerName": "scripts",
+        "scriptBlobName": "post-config.sh",
+        "scriptSasRequest": {
+          "canonicalizedResource": "[[format('/blob/{0}/{1}/{2}', variables('scriptStorageAccountName'), variables('scriptContainerName'), variables('scriptBlobName'))]",
+          "signedResource": "b",
+          "signedPermission": "r",
+          "signedProtocol": "https",
+          "signedStart": "[[dateTimeAdd(parameters('internalBaseTimestamp'), '-PT5M')]",
+          "signedExpiry": "[[dateTimeAdd(parameters('internalBaseTimestamp'), 'P1DT15M')]"
+        }
+      },
+      "resources": [
+        {
+          "type": "Microsoft.Storage/storageAccounts",
+          "apiVersion": "2023-05-01",
+          "name": "[[variables('scriptStorageAccountName')]",
+          "location": "[[parameters('Location')]",
+          "kind": "StorageV2",
+          "sku": {
+            "name": "Standard_LRS"
+          },
+          "properties": {
+            "allowBlobPublicAccess": false,
+            "allowSharedKeyAccess": true,
+            "minimumTlsVersion": "TLS1_2",
+            "publicNetworkAccess": "Enabled",
+            "supportsHttpsTrafficOnly": true
+          }
+        },
+        {
+          "type": "Microsoft.Storage/storageAccounts/blobServices",
+          "apiVersion": "2023-05-01",
+          "name": "[[format('{0}/{1}', variables('scriptStorageAccountName'), 'default')]",
+          "dependsOn": [
+            "[[resourceId('Microsoft.Storage/storageAccounts', variables('scriptStorageAccountName'))]"
+          ]
+        },
+        {
+          "type": "Microsoft.Storage/storageAccounts/blobServices/containers",
+          "apiVersion": "2023-05-01",
+          "name": "[[format('{0}/{1}/{2}', variables('scriptStorageAccountName'), 'default', variables('scriptContainerName'))]",
+          "properties": {
+            "publicAccess": "None"
+          },
+          "dependsOn": [
+            "[[resourceId('Microsoft.Storage/storageAccounts/blobServices', variables('scriptStorageAccountName'), 'default')]"
+          ]
+        },
+        {
+          "type": "Microsoft.Resources/deploymentScripts",
+          "apiVersion": "2023-08-01",
+          "name": "upload-ghes-post-config",
+          "location": "[[parameters('Location')]",
+          "kind": "AzureCLI",
+          "properties": {
+            "azCliVersion": "2.89.1",
+            "environmentVariables": [
+              {
+                "name": "AZURE_STORAGE_KEY",
+                "secureValue": "[[listKeys(resourceId('Microsoft.Storage/storageAccounts', variables('scriptStorageAccountName')), '2023-05-01').keys[0].value]"
+              },
+              {
+                "name": "STORAGE_ACCOUNT_NAME",
+                "value": "[[variables('scriptStorageAccountName')]"
+              },
+              {
+                "name": "ASSET_CONTAINER_NAME",
+                "value": "[[variables('scriptContainerName')]"
+              },
+              {
+                "name": "SCRIPT_BLOB_NAME",
+                "value": "[[variables('scriptBlobName')]"
+              },
+              {
+                "name": "POST_CONFIG_SCRIPT",
+                "value": "[[variables('$fxv#0')]"
+              }
+            ],
+            "scriptContent": "[[variables('$fxv#1')]",
+            "timeout": "PT15M",
+            "cleanupPreference": "Always",
+            "retentionInterval": "P1D",
+            "forceUpdateTag": "[[parameters('internalBaseTimestamp')]"
+          },
+          "dependsOn": [
+            "[[resourceId('Microsoft.Storage/storageAccounts/blobServices/containers', variables('scriptStorageAccountName'), 'default', variables('scriptContainerName'))]",
+            "[[resourceId('Microsoft.Storage/storageAccounts', variables('scriptStorageAccountName'))]"
+          ]
+        },
+        {
+          "type": "Microsoft.HybridCompute/machines/runCommands",
+          "apiVersion": "2024-07-10",
+          "name": "[[format('{0}/{1}', parameters('VmName'), parameters('RunCommandName'))]",
+          "location": "[[parameters('Location')]",
+          "properties": {
+            "asyncExecution": "[[parameters('AsyncExecution')]",
+            "timeoutInSeconds": "[[mul(add(add(parameters('ReadyTimeoutMinutes'), parameters('ApplyTimeoutMinutes')), 30), 60)]",
+            "source": {
+              "scriptUri": "[[format('{0}{1}/{2}?{3}', reference(resourceId('Microsoft.Storage/storageAccounts', variables('scriptStorageAccountName')), '2023-05-01').primaryEndpoints.blob, variables('scriptContainerName'), variables('scriptBlobName'), listServiceSas(resourceId('Microsoft.Storage/storageAccounts', variables('scriptStorageAccountName')), '2023-05-01', variables('scriptSasRequest')).serviceSasToken)]"
+            },
+            "parameters": [
+              {
+                "name": "GHES_HOSTNAME",
+                "value": "[[parameters('GithubHostName')]"
+              },
+              {
+                "name": "GHES_SUBDOMAIN_ISOLATION",
+                "value": "[[string(parameters('SubdomainIsolation'))]"
+              },
+              {
+                "name": "GHES_SIGNUP_ENABLED",
+                "value": "[[string(parameters('SignupEnabled'))]"
+              },
+              {
+                "name": "GHES_PUBLIC_PAGES",
+                "value": "[[string(parameters('PublicPages'))]"
+              },
+              {
+                "name": "GHES_MANAGE_PORT",
+                "value": "[[string(parameters('ManagePort'))]"
+              },
+              {
+                "name": "GHES_APPLY_TIMEOUT_MIN",
+                "value": "[[string(parameters('ApplyTimeoutMinutes'))]"
+              },
+              {
+                "name": "GHES_READY_TIMEOUT_MIN",
+                "value": "[[string(parameters('ReadyTimeoutMinutes'))]"
+              },
+              {
+                "name": "GHES_SKIP_APPLY",
+                "value": "[[string(parameters('SkipApply'))]"
+              },
+              {
+                "name": "GHES_KEYVAULT_URI",
+                "value": "[[parameters('KeyVaultUri')]"
+              },
+              {
+                "name": "GHES_LICENSE_PART1_SECRET_NAME",
+                "value": "[[parameters('LicenseBase64Part1KeyName')]"
+              },
+              {
+                "name": "GHES_LICENSE_PART2_SECRET_NAME",
+                "value": "[[parameters('LicenseBase64Part2KeyName')]"
+              }
+            ],
+            "protectedParameters": [
+              {
+                "name": "GHES_MGMT_PASSWORD",
+                "value": "[[parameters('GithubManagementConsolePassword')]"
+              }
+            ]
+          },
+          "dependsOn": [
+            "[[resourceId('Microsoft.Storage/storageAccounts/blobServices/containers', variables('scriptStorageAccountName'), 'default', variables('scriptContainerName'))]",
+            "[[resourceId('Microsoft.Storage/storageAccounts', variables('scriptStorageAccountName'))]",
+            "[[resourceId('Microsoft.Resources/deploymentScripts', 'upload-ghes-post-config')]"
+          ]
+        }
+      ]
+    },
     "Location": "eastus",
     "cloudTargetName": "cloud-target",
     "contextName": "defaultContext",
     "contextHierarchyName": "line",
     "infraCapabilityName": "ghes-infrastructure",
     "ghesSolutionTemplateName": "ghes-solution-template",
+    "ghesPostConfigSolutionTemplateName": "ghes-postconfig-template",
     "ghesSolutionTemplateVersionName": "1.0.0",
     "ghesSpecName": "ghesspec",
+    "ghesPostConfigSpecName": "ghes-postconfig-spec",
     "ghesSpecVersion": "1.0.0",
     "CustomLocationId": "",
     "VmImageName": "ghes-image",
@@ -147,10 +381,6 @@
     "DnsServers": [],
     "DefaultGateway": "",
     "VmNamePrefix": "ghes",
-    "TenantId": "[subscription().tenantId]",
-    "KeyVaultSkuName": "standard",
-    "EnableRbacAuthorization": true,
-    "SoftDeleteRetentionInDays": 7,
     "ManagementConsolePasswordSecretName": "ghes-mgmt-console-password",
     "AdminPasswordSecretName": "ghes-admin-password",
     "GithubHostName": "",
@@ -166,16 +396,15 @@
     "SkipApply": false,
     "AsyncExecution": true,
     "RunCommandName": "ghes-postconfig",
+    "keyVaultSecretsUserRoleDefinitionId": "4633458b-17de-408a-b874-0445c86b69e6",
+    "keyVaultIdSegments": "[split(parameters('KeyVaultResourceId'), '/')]",
+    "keyVaultSubscriptionId": "[variables('keyVaultIdSegments')[2]]",
+    "keyVaultResourceGroupName": "[variables('keyVaultIdSegments')[4]]",
+    "keyVaultName": "[variables('keyVaultIdSegments')[8]]",
+    "canonicalKeyVaultResourceId": "[format('/subscriptions/{0}/resourceGroups/{1}/providers/Microsoft.KeyVault/vaults/{2}', variables('keyVaultSubscriptionId'), variables('keyVaultResourceGroupName'), variables('keyVaultName'))]",
     "ghesTemplate": {
       "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
       "contentVersion": "1.0.0.0",
-      "metadata": {
-        "_generator": {
-          "name": "bicep",
-          "version": "0.48.1.52935",
-          "templateHash": "12638164160614974244"
-        }
-      },
       "parameters": {
         "clusterName": {
           "type": "string",
@@ -344,123 +573,15 @@
             "description": "Memory to assign to the VM, in MB."
           }
         },
-        "NumberDataDisks": {
-          "type": "int",
-          "defaultValue": 1,
-          "minValue": 0,
-          "metadata": {
-            "description": "Number of data disks to create and attach."
-          }
-        },
         "DiskSizeGB": {
           "type": "int",
           "defaultValue": 500,
           "metadata": {
             "description": "Size of each data disk in GB."
           }
-        },
-        "ManagementConsolePasswordKeyName": {
-          "type": "string",
-          "metadata": {
-            "description": "Name of the secret in the Key Vault containing the management console password for the VM."
-          }
-        },
-        "GithubHostName": {
-          "type": "string",
-          "defaultValue": "",
-          "metadata": {
-            "description": "OVERRIDE: full GHES hostname (FQDN). Blank => <GithubHostLabel>.<domainFqdn-from-deploymentSettings>."
-          }
-        },
-        "GithubHostLabel": {
-          "type": "string",
-          "defaultValue": "githubenterpriselocal",
-          "metadata": {
-            "description": "Hostname label prepended to the domain FQDN when GithubHostName is blank."
-          }
-        },
-        "LicenseBase64Part1KeyName": {
-          "type": "string",
-          "metadata": {
-            "description": "Name of the secret in the Key Vault containing the first half of the base64 of the GHES .ghl license file."
-          }
-        },
-        "LicenseBase64Part2KeyName": {
-          "type": "string",
-          "metadata": {
-            "description": "Name of the secret in the Key Vault containing the second half of the base64 of the GHES .ghl license file."
-          }
-        },
-        "SubdomainIsolation": {
-          "type": "bool",
-          "defaultValue": true,
-          "metadata": {
-            "description": "Enable subdomain isolation."
-          }
-        },
-        "SignupEnabled": {
-          "type": "bool",
-          "defaultValue": false,
-          "metadata": {
-            "description": "Allow built-in signups (kept off for AD/LDAP-backed instances)."
-          }
-        },
-        "PublicPages": {
-          "type": "bool",
-          "defaultValue": false,
-          "metadata": {
-            "description": "Enable public GitHub Pages."
-          }
-        },
-        "ManagePort": {
-          "type": "int",
-          "defaultValue": 8443,
-          "metadata": {
-            "description": "Manage API port on the appliance."
-          }
-        },
-        "ApplyTimeoutMinutes": {
-          "type": "int",
-          "defaultValue": 120,
-          "minValue": 10,
-          "maxValue": 1440,
-          "metadata": {
-            "description": "Cap (minutes) on the on-box ghe-config-apply."
-          }
-        },
-        "ReadyTimeoutMinutes": {
-          "type": "int",
-          "defaultValue": 30,
-          "minValue": 5,
-          "maxValue": 240,
-          "metadata": {
-            "description": "Minutes to wait for the Manage API + init-triggered apply to settle before staging settings."
-          }
-        },
-        "SkipApply": {
-          "type": "bool",
-          "defaultValue": false,
-          "metadata": {
-            "description": "Stage settings only; skip ghe-config-apply (useful for a dry run)."
-          }
-        },
-        "AsyncExecution": {
-          "type": "bool",
-          "defaultValue": false,
-          "metadata": {
-            "description": "Run the config-apply asynchronously (deployment returns immediately). Default false so the deployment waits for completion."
-          }
-        },
-        "RunCommandName": {
-          "type": "string",
-          "defaultValue": "ghes-postconfig",
-          "metadata": {
-            "description": "Name of the Run Command resource created on the appliance."
-          }
         }
       },
       "variables": {
-        "$fxv#0": "#!/usr/bin/env bash\nset -uo pipefail\nGHES_HOSTNAME=\"${GHES_HOSTNAME:-}\"\nGHES_MGMT_PASSWORD=\"${GHES_MGMT_PASSWORD:-}\"\nGHES_LICENSE_B64_PART1=\"${GHES_LICENSE_B64_PART1:-}\"\nGHES_LICENSE_B64_PART2=\"${GHES_LICENSE_B64_PART2:-}\"\nGHES_LICENSE_B64=\"${GHES_LICENSE_B64_PART1}${GHES_LICENSE_B64_PART2}\"\nGHES_SUBDOMAIN_ISOLATION=\"${GHES_SUBDOMAIN_ISOLATION:-true}\"\nGHES_SIGNUP_ENABLED=\"${GHES_SIGNUP_ENABLED:-false}\"\nGHES_PUBLIC_PAGES=\"${GHES_PUBLIC_PAGES:-false}\"\nGHES_MANAGE_PORT=\"${GHES_MANAGE_PORT:-8443}\"\nGHES_APPLY_TIMEOUT_MIN=\"${GHES_APPLY_TIMEOUT_MIN:-120}\"\nGHES_READY_TIMEOUT_MIN=\"${GHES_READY_TIMEOUT_MIN:-30}\"\nGHES_SKIP_APPLY=\"${GHES_SKIP_APPLY:-false}\"\nGHES_VERIFY=\"${GHES_VERIFY:-true}\"\nGHES_VERIFY_STRICT=\"${GHES_VERIFY_STRICT:-false}\"\nLIC_FILE=\"$(mktemp /tmp/ghes-license.XXXXXX.ghl)\"\nPW_FILE=\"$(mktemp /tmp/ghes-pw.XXXXXX)\"\nINIT_OUT=\"$(mktemp /tmp/ghes-init.XXXXXX.out)\"\nSETTINGS_OUT=\"$(mktemp /tmp/ghes-settings.XXXXXX.out)\"\nlog()  { printf '%s [post-config] %s\\n' \"$(date -u +%Y-%m-%dT%H:%M:%SZ)\" \"$*\"; }\ndie()  { log \"ERROR: $*\"; cleanup; exit 1; }\ncleanup() { rm -f \"$LIC_FILE\" \"$PW_FILE\" \"$INIT_OUT\" \"$SETTINGS_OUT\" 2>/dev/null || true; }\ntrap cleanup EXIT\nlc() { printf '%s' \"$1\" | tr '[:upper:]' '[:lower:]'; }\n[[ \"${EUID:-$(id -u)}\" -eq 0 ]] || die \"must run as root (Arc Linux Run Command runs as root by default).\"\ncommand -v curl >/dev/null 2>&1 || die \"curl not found on the appliance.\"\ncommand -v ghe-config-apply >/dev/null 2>&1 || die \"ghe-config-apply not found - this does not look like a GHES appliance.\"\n[[ -n \"$GHES_HOSTNAME\" ]]      || die \"GHES_HOSTNAME is required.\"\n[[ -n \"$GHES_MGMT_PASSWORD\" ]] || die \"GHES_MGMT_PASSWORD is required (protected parameter).\"\n[[ -n \"$GHES_LICENSE_B64\" ]]   || die \"GHES_LICENSE_B64 is required (protected parameter).\"\nSUBDOM=\"$(lc \"$GHES_SUBDOMAIN_ISOLATION\")\"; [[ \"$SUBDOM\" == \"true\"   || \"$SUBDOM\" == \"false\" ]]   || SUBDOM=\"true\"\nSIGNUP=\"$(lc \"$GHES_SIGNUP_ENABLED\")\";      [[ \"$SIGNUP\" == \"true\"   || \"$SIGNUP\" == \"false\" ]]   || SIGNUP=\"false\"\nPUBPAGES=\"$(lc \"$GHES_PUBLIC_PAGES\")\";      [[ \"$PUBPAGES\" == \"true\" || \"$PUBPAGES\" == \"false\" ]] || PUBPAGES=\"false\"\nPORT=\"$GHES_MANAGE_PORT\"\nBASE=\"https://127.0.0.1:${PORT}\"\nlog \"hostname=${GHES_HOSTNAME} port=${PORT} subdomain_isolation=${SUBDOM} signup_enabled=${SIGNUP} public_pages=${PUBPAGES}\"\nprintf '%s' \"$GHES_LICENSE_B64\" | tr -d '[:space:]' | base64 -d > \"$LIC_FILE\" 2>/dev/null \\\n    || die \"failed to base64-decode GHES_LICENSE_B64.\"\n[[ -s \"$LIC_FILE\" ]] || die \"decoded license file is empty.\"\nchmod 600 \"$LIC_FILE\"\nprintf '%s' \"$GHES_MGMT_PASSWORD\" > \"$PW_FILE\"\nchmod 600 \"$PW_FILE\"\nauth_config() {\n    local esc=${GHES_MGMT_PASSWORD//\\\\/\\\\\\\\}\n    esc=${esc//\\\"/\\\\\\\"}\n    printf 'user = \"api_key:%s\"\\n' \"$esc\"\n}\nmanage_api_code() {\n    auth_config | curl -K - -k -sS -o /dev/null -w '%{http_code}' --connect-timeout 10 --max-time 30 \\\n        \"${BASE}/manage/v1/config/settings\" 2>/dev/null || echo 000\n}\napply_in_progress() { pgrep -f 'ghe-config-apply' >/dev/null 2>&1; }\ninit_ghes() {\n    local code\n    log \"initializing via ${BASE}/manage/v1/config/init\"\n    code=$(curl -k -sS -o \"$INIT_OUT\" -w '%{http_code}' --connect-timeout 15 --max-time 120 \\\n        -X POST -F \"license=@${LIC_FILE}\" -F \"password=<${PW_FILE}\" \\\n        \"${BASE}/manage/v1/config/init\" 2>/dev/null || echo 000)\n    case \"$code\" in\n        202) log \"init accepted (HTTP 202).\"; return 0 ;;\n        400) if grep -qiE 'password[[:space:]]+already[[:space:]]+set' \"$INIT_OUT\" 2>/dev/null; then\n                 log \"instance already initialized (password already set) - continuing.\"; return 0\n             fi ;;\n    esac\n    log \"manage init returned HTTP ${code}; trying legacy /setup/api/start.\"\n    code=$(curl -k -sS -o \"$INIT_OUT\" -w '%{http_code}' --connect-timeout 15 --max-time 120 \\\n        -X POST -F \"license=@${LIC_FILE}\" -F \"password=<${PW_FILE}\" \\\n        \"${BASE}/setup/api/start\" 2>/dev/null || echo 000)\n    case \"$code\" in\n        200|201|202) log \"legacy init accepted (HTTP ${code}).\"; return 0 ;;\n        400) if grep -qiE 'password[[:space:]]+already[[:space:]]+set' \"$INIT_OUT\" 2>/dev/null; then\n                 log \"instance already initialized - continuing.\"; return 0\n             fi ;;\n    esac\n    log \"init response body (first 300 chars): $(head -c 300 \"$INIT_OUT\" 2>/dev/null)\"\n    return 1\n}\nwait_ready() {\n    local deadline code\n    deadline=$(( $(date +%s) + GHES_READY_TIMEOUT_MIN * 60 ))\n    log \"waiting up to ${GHES_READY_TIMEOUT_MIN}m for Manage API + initial apply to settle.\"\n    while (( $(date +%s) < deadline )); do\n        code=$(manage_api_code)\n        if [[ \"$code\" == \"200\" ]] && ! apply_in_progress; then\n            log \"Manage API ready (HTTP 200) and no apply in progress.\"\n            return 0\n        fi\n        log \"not ready yet (manage_api=${code}, apply_running=$(apply_in_progress && echo yes || echo no)); retrying in 30s.\"\n        sleep 30\n    done\n    return 1\n}\nstage_settings() {\n    local body code\n    body=$(printf '{\"github_hostname\":\"%s\",\"subdomain_isolation\":%s,\"signup_enabled\":%s,\"public_pages\":%s}' \\\n        \"$GHES_HOSTNAME\" \"$SUBDOM\" \"$SIGNUP\" \"$PUBPAGES\")\n    log \"staging settings via PUT ${BASE}/manage/v1/config/settings\"\n    code=$(auth_config | curl -K - -k -sS -o \"$SETTINGS_OUT\" -w '%{http_code}' --connect-timeout 15 --max-time 120 \\\n        -H 'Content-Type: application/json' \\\n        -X PUT --data \"$body\" \"${BASE}/manage/v1/config/settings\" 2>/dev/null || echo 000)\n    if [[ \"$code\" =~ ^2 ]]; then\n        log \"settings staged (HTTP ${code}).\"\n        return 0\n    fi\n    log \"settings response body (first 300 chars): $(head -c 300 \"$SETTINGS_OUT\" 2>/dev/null)\"\n    die \"settings PUT failed (HTTP ${code}).\"\n}\napply_config() {\n    local logf rc\n    logf=\"/data/user/common/ghe-config-apply.$(date -u +%Y%m%d%H%M%S).log\"\n    log \"running ghe-config-apply (timeout ${GHES_APPLY_TIMEOUT_MIN}m); log: ${logf}\"\n    if command -v timeout >/dev/null 2>&1; then\n        timeout \"${GHES_APPLY_TIMEOUT_MIN}m\" ghe-config-apply >\"$logf\" 2>&1 && rc=0 || rc=$?\n    else\n        ghe-config-apply >\"$logf\" 2>&1 && rc=0 || rc=$?\n    fi\n    log \"ghe-config-apply exit code: ${rc}\"\n    log \"--- last 20 lines of apply log ---\"\n    tail -n 20 \"$logf\" 2>/dev/null || true\n    log \"----------------------------------\"\n    return \"$rc\"\n}\nverify_endpoints() {\n    [[ \"$(lc \"$GHES_VERIFY\")\" == \"true\" ]] || { log \"endpoint self-verify skipped (GHES_VERIFY=false).\"; return 0; }\n    local failures=0\n    check_code() {\n        local desc=\"$1\" url=\"$2\" expected=\"$3\"; shift 3\n        local code\n        code=$(curl -k -sS -o /dev/null -w '%{http_code}' --connect-timeout 10 --max-time 30 \"$@\" \"$url\" 2>/dev/null || echo 000)\n        if [[ \"$code\" =~ ^($expected)$ ]]; then\n            log \"verify PASS: ${desc} (HTTP ${code})\"\n        else\n            log \"verify FAIL: ${desc} (expected ${expected}, got ${code})\"\n            failures=$((failures + 1))\n        fi\n    }\n    log \"verifying appliance endpoints (Host: ${GHES_HOSTNAME}).\"\n    check_code \"web root -> redirect to /login\" \"https://127.0.0.1/\"             '301|302' -H \"Host: ${GHES_HOSTNAME}\"\n    check_code \"login page reachable\"           \"https://127.0.0.1/login\"        '200'     -H \"Host: ${GHES_HOSTNAME}\"\n    check_code \"manage API requires auth\"       \"${BASE}/manage/v1/config/apply\" '401'\n    if (( failures > 0 )); then\n        if [[ \"$(lc \"$GHES_VERIFY_STRICT\")\" == \"true\" ]]; then\n            die \"endpoint self-verify failed (${failures} check(s)) and GHES_VERIFY_STRICT=true.\"\n        fi\n        log \"WARNING: endpoint self-verify reported ${failures} failure(s) (non-fatal; set GHES_VERIFY_STRICT=true to fail).\"\n    else\n        log \"endpoint self-verify: all checks passed.\"\n    fi\n    return 0\n}\ninit_ghes    || die \"GHES first-boot initialization failed.\"\nwait_ready   || die \"GHES Manage API did not become ready within ${GHES_READY_TIMEOUT_MIN}m.\"\nstage_settings\nif [[ \"$(lc \"$GHES_SKIP_APPLY\")\" == \"true\" ]]; then\n    log \"GHES_SKIP_APPLY=true - settings staged but skipping ghe-config-apply.\"\n    log \"post-config completed (staged only).\"\n    exit 0\nfi\nif apply_config; then\n    log \"post-config completed successfully.\"\n    verify_endpoints\n    log \"REMINDER: Active Directory objects, DNS records, and LDAP auth-mode remain MANUAL.\"\n    exit 0\nelse\n    die \"ghe-config-apply reported a non-zero exit; see the apply log above.\"\nfi\n",
         "effectiveCustomLocationId": "[[if(empty(parameters('CustomLocationId')), resourceId('Microsoft.ExtendedLocation/customLocations', format('{0}-customlocation', parameters('clusterName'))), parameters('CustomLocationId'))]",
         "maskToPrefix": {
           "255.0.0.0": 8,
@@ -539,11 +660,11 @@
         {
           "[string('copy')]": {
             "name": "dataDisks",
-            "count": "[[length(range(0, parameters('NumberDataDisks')))]"
+            "count": 1
           },
           "type": "Microsoft.AzureStackHCI/virtualHardDisks",
           "apiVersion": "2025-04-01-preview",
-          "name": "[[format('{0}-datadisk{1}', variables('effectiveVmName'), range(0, parameters('NumberDataDisks'))[copyIndex()])]",
+          "name": "[[format('{0}-datadisk{1}', variables('effectiveVmName'), copyIndex())]",
           "location": "[[parameters('Location')]",
           "extendedLocation": {
             "type": "CustomLocation",
@@ -625,44 +746,8 @@
               "Memory": {
                 "value": "[[parameters('Memory')]"
               },
-              "NumberDataDisks": {
-                "value": "[[parameters('NumberDataDisks')]"
-              },
               "DiskSizeGB": {
                 "value": "[[parameters('DiskSizeGB')]"
-              },
-              "RunCommandName": {
-                "value": "[[parameters('RunCommandName')]"
-              },
-              "AsyncExecution": {
-                "value": "[[parameters('AsyncExecution')]"
-              },
-              "ApplyTimeoutMinutes": {
-                "value": "[[parameters('ApplyTimeoutMinutes')]"
-              },
-              "ReadyTimeoutMinutes": {
-                "value": "[[parameters('ReadyTimeoutMinutes')]"
-              },
-              "SkipApply": {
-                "value": "[[parameters('SkipApply')]"
-              },
-              "SubdomainIsolation": {
-                "value": "[[parameters('SubdomainIsolation')]"
-              },
-              "SignupEnabled": {
-                "value": "[[parameters('SignupEnabled')]"
-              },
-              "PublicPages": {
-                "value": "[[parameters('PublicPages')]"
-              },
-              "ManagePort": {
-                "value": "[[parameters('ManagePort')]"
-              },
-              "PostConfigScript": {
-                "value": "[[variables('$fxv#0')]"
-              },
-              "GithubHostName": {
-                "value": "[[if(not(empty(parameters('GithubHostName'))), parameters('GithubHostName'), format('{0}.{1}', parameters('GithubHostLabel'), reference(resourceId('Microsoft.AzureStackHCI/clusters/deploymentSettings', split(format('{0}/default', parameters('clusterName')), '/')[0], split(format('{0}/default', parameters('clusterName')), '/')[1]), '2024-04-01').deploymentConfiguration.scaleUnits[0].deploymentData.domainFqdn))]"
               },
               "AdminPassword": {
                 "reference": {
@@ -670,30 +755,6 @@
                     "id": "[[parameters('KeyVaultId')]"
                   },
                   "secretName": "[[parameters('AdminPasswordKeyName')]"
-                }
-              },
-              "ManagementConsolePassword": {
-                "reference": {
-                  "keyVault": {
-                    "id": "[[parameters('KeyVaultId')]"
-                  },
-                  "secretName": "[[parameters('ManagementConsolePasswordKeyName')]"
-                }
-              },
-              "LicenseBase64Part1": {
-                "reference": {
-                  "keyVault": {
-                    "id": "[[parameters('KeyVaultId')]"
-                  },
-                  "secretName": "[[parameters('LicenseBase64Part1KeyName')]"
-                }
-              },
-              "LicenseBase64Part2": {
-                "reference": {
-                  "keyVault": {
-                    "id": "[[parameters('KeyVaultId')]"
-                  },
-                  "secretName": "[[parameters('LicenseBase64Part2KeyName')]"
                 }
               }
             },
@@ -728,53 +789,8 @@
                 "Memory": {
                   "type": "int"
                 },
-                "NumberDataDisks": {
-                  "type": "int"
-                },
                 "DiskSizeGB": {
                   "type": "int"
-                },
-                "RunCommandName": {
-                  "type": "string"
-                },
-                "AsyncExecution": {
-                  "type": "bool"
-                },
-                "ApplyTimeoutMinutes": {
-                  "type": "int"
-                },
-                "ReadyTimeoutMinutes": {
-                  "type": "int"
-                },
-                "SkipApply": {
-                  "type": "bool"
-                },
-                "SubdomainIsolation": {
-                  "type": "bool"
-                },
-                "SignupEnabled": {
-                  "type": "bool"
-                },
-                "PublicPages": {
-                  "type": "bool"
-                },
-                "ManagePort": {
-                  "type": "int"
-                },
-                "PostConfigScript": {
-                  "type": "string"
-                },
-                "GithubHostName": {
-                  "type": "string"
-                },
-                "ManagementConsolePassword": {
-                  "type": "securestring"
-                },
-                "LicenseBase64Part1": {
-                  "type": "securestring"
-                },
-                "LicenseBase64Part2": {
-                  "type": "securestring"
                 }
               },
               "resources": [
@@ -811,9 +827,9 @@
                       "[string('copy')]": [
                         {
                           "name": "dataDisks",
-                          "count": "[[length(range(0, parameters('NumberDataDisks')))]",
+                          "count": 1,
                           "input": {
-                            "id": "[[resourceId('Microsoft.AzureStackHCI/virtualHardDisks', format('{0}-datadisk{1}', parameters('VmName'), range(0, parameters('NumberDataDisks'))[copyIndex('dataDisks')]))]"
+                            "id": "[[resourceId('Microsoft.AzureStackHCI/virtualHardDisks', format('{0}-datadisk{1}', parameters('VmName'), copyIndex('dataDisks')))]"
                           }
                         }
                       ],
@@ -831,70 +847,6 @@
                     },
                     "httpProxyConfig": {}
                   }
-                },
-                {
-                  "type": "Microsoft.HybridCompute/machines/runCommands",
-                  "apiVersion": "2024-07-10",
-                  "name": "[[format('{0}/{1}', parameters('VmName'), parameters('RunCommandName'))]",
-                  "location": "[[parameters('Location')]",
-                  "properties": {
-                    "asyncExecution": "[[parameters('AsyncExecution')]",
-                    "timeoutInSeconds": "[[mul(add(add(parameters('ReadyTimeoutMinutes'), parameters('ApplyTimeoutMinutes')), 30), 60)]",
-                    "source": {
-                      "script": "[[parameters('PostConfigScript')]"
-                    },
-                    "parameters": [
-                      {
-                        "name": "GHES_HOSTNAME",
-                        "value": "[[parameters('GithubHostName')]"
-                      },
-                      {
-                        "name": "GHES_SUBDOMAIN_ISOLATION",
-                        "value": "[[string(parameters('SubdomainIsolation'))]"
-                      },
-                      {
-                        "name": "GHES_SIGNUP_ENABLED",
-                        "value": "[[string(parameters('SignupEnabled'))]"
-                      },
-                      {
-                        "name": "GHES_PUBLIC_PAGES",
-                        "value": "[[string(parameters('PublicPages'))]"
-                      },
-                      {
-                        "name": "GHES_MANAGE_PORT",
-                        "value": "[[string(parameters('ManagePort'))]"
-                      },
-                      {
-                        "name": "GHES_APPLY_TIMEOUT_MIN",
-                        "value": "[[string(parameters('ApplyTimeoutMinutes'))]"
-                      },
-                      {
-                        "name": "GHES_READY_TIMEOUT_MIN",
-                        "value": "[[string(parameters('ReadyTimeoutMinutes'))]"
-                      },
-                      {
-                        "name": "GHES_SKIP_APPLY",
-                        "value": "[[string(parameters('SkipApply'))]"
-                      }
-                    ],
-                    "protectedParameters": [
-                      {
-                        "name": "GHES_MGMT_PASSWORD",
-                        "value": "[[parameters('ManagementConsolePassword')]"
-                      },
-                      {
-                        "name": "GHES_LICENSE_B64_PART1",
-                        "value": "[[parameters('LicenseBase64Part1')]"
-                      },
-                      {
-                        "name": "GHES_LICENSE_B64_PART2",
-                        "value": "[[parameters('LicenseBase64Part2')]"
-                      }
-                    ]
-                  },
-                  "dependsOn": [
-                    "[[extensionResourceId(resourceId('Microsoft.HybridCompute/machines', parameters('VmName')), 'Microsoft.AzureStackHCI/virtualMachineInstances', 'default')]"
-                  ]
                 }
               ]
             }
@@ -928,13 +880,6 @@
             "description": "Resource ID of the Arc HybridCompute machine."
           },
           "value": "[[resourceId('Microsoft.HybridCompute/machines', variables('effectiveVmName'))]"
-        },
-        "runCommandResourceId": {
-          "type": "string",
-          "metadata": {
-            "description": "Resource ID of the post-config Run Command."
-          },
-          "value": "[[resourceId('Microsoft.HybridCompute/machines/runCommands', variables('effectiveVmName'), parameters('RunCommandName'))]"
         },
         "resolvedCustomLocationId": {
           "type": "string",
@@ -984,20 +929,9 @@
             "description": "Resolved VM name."
           },
           "value": "[[variables('effectiveVmName')]"
-        },
-        "resolvedGithubHostName": {
-          "type": "string",
-          "metadata": {
-            "description": "Resolved GHES hostname (FQDN)."
-          },
-          "value": "[[if(not(empty(parameters('GithubHostName'))), parameters('GithubHostName'), format('{0}.{1}', parameters('GithubHostLabel'), reference(resourceId('Microsoft.AzureStackHCI/clusters/deploymentSettings', split(format('{0}/default', parameters('clusterName')), '/')[0], split(format('{0}/default', parameters('clusterName')), '/')[1]), '2024-04-01').deploymentConfiguration.scaleUnits[0].deploymentData.domainFqdn))]"
         }
       }
     },
-    "licenseLength": "[length(parameters('LicenseBase64'))]",
-    "licenseHalf": "[div(variables('licenseLength'), 2)]",
-    "licensePart1": "[substring(parameters('LicenseBase64'), 0, variables('licenseHalf'))]",
-    "licensePart2": "[substring(parameters('LicenseBase64'), variables('licenseHalf'), sub(variables('licenseLength'), variables('licenseHalf')))]",
     "createContext": "[empty(parameters('existingContextId'))]",
     "contextIdParts": "[split(if(variables('createContext'), resourceId('Microsoft.Edge/contexts', variables('contextName')), parameters('existingContextId')), '/')]",
     "existingContextSubscriptionId": "[variables('contextIdParts')[2]]",
@@ -1007,6 +941,9 @@
   },
   "resources": {
     "ghesSolutionTemplate::solutionVersion": {
+      "@options": {
+        "onlyIfNotExists": []
+      },
       "type": "Microsoft.Edge/solutionTemplates/versions",
       "apiVersion": "2026-05-01-preview",
       "name": "[format('{0}/{1}', variables('ghesSolutionTemplateName'), variables('ghesSolutionTemplateVersionName'))]",
@@ -1032,27 +969,12 @@
             "DefaultGateway": "[variables('DefaultGateway')]",
             "VmName": "[parameters('VmName')]",
             "VmNamePrefix": "[variables('VmNamePrefix')]",
-            "KeyVaultId": "[resourceId('Microsoft.KeyVault/vaults', parameters('KeyVaultName'))]",
+            "KeyVaultId": "[extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', variables('keyVaultSubscriptionId'), variables('keyVaultResourceGroupName')), 'Microsoft.KeyVault/vaults', variables('keyVaultName'))]",
             "AdminUsername": "[parameters('AdminUsername')]",
             "AdminPasswordKeyName": "[variables('AdminPasswordSecretName')]",
             "CPU": "[parameters('CPU')]",
             "Memory": "[parameters('Memory')]",
-            "NumberDataDisks": "[parameters('NumberDataDisks')]",
-            "DiskSizeGB": "[parameters('DiskSizeGB')]",
-            "ManagementConsolePasswordKeyName": "[variables('ManagementConsolePasswordSecretName')]",
-            "GithubHostName": "[variables('GithubHostName')]",
-            "GithubHostLabel": "[variables('GithubHostLabel')]",
-            "LicenseBase64Part1KeyName": "[variables('LicensePart1SecretName')]",
-            "LicenseBase64Part2KeyName": "[variables('LicensePart2SecretName')]",
-            "SubdomainIsolation": "[variables('SubdomainIsolation')]",
-            "SignupEnabled": "[variables('SignupEnabled')]",
-            "PublicPages": "[variables('PublicPages')]",
-            "ManagePort": "[variables('ManagePort')]",
-            "ApplyTimeoutMinutes": "[variables('ApplyTimeoutMinutes')]",
-            "ReadyTimeoutMinutes": "[variables('ReadyTimeoutMinutes')]",
-            "SkipApply": "[variables('SkipApply')]",
-            "AsyncExecution": "[variables('AsyncExecution')]",
-            "RunCommandName": "[variables('RunCommandName')]"
+            "DiskSizeGB": "[parameters('DiskSizeGB')]"
           }
         },
         "specification": {
@@ -1073,81 +995,77 @@
         }
       },
       "dependsOn": [
-        "adminPasswordSecret",
         "ghesSolutionTemplate",
         "ghesTemplateSpec",
-        "ghesTemplateSpecVersion",
-        "keyVault",
-        "licensePart1Secret",
-        "licensePart2Secret",
-        "managementConsolePasswordSecret"
+        "ghesTemplateSpecVersion"
+      ]
+    },
+    "ghesPostConfigSolutionTemplate::solutionVersion": {
+      "@options": {
+        "onlyIfNotExists": []
+      },
+      "type": "Microsoft.Edge/solutionTemplates/versions",
+      "apiVersion": "2026-05-01-preview",
+      "name": "[format('{0}/{1}', variables('ghesPostConfigSolutionTemplateName'), variables('ghesSolutionTemplateVersionName'))]",
+      "properties": {
+        "configurations": {
+          "configs": {
+            "Location": "[variables('Location')]",
+            "VmName": "[parameters('VmName')]",
+            "KeyVaultUri": "[reference('keyVault').vaultUri]",
+            "GithubManagementConsolePassword": "[parameters('GithubManagementConsolePassword')]",
+            "LicenseBase64Part1KeyName": "[variables('LicensePart1SecretName')]",
+            "LicenseBase64Part2KeyName": "[variables('LicensePart2SecretName')]",
+            "GithubHostName": "[if(not(empty(variables('GithubHostName'))), variables('GithubHostName'), format('{0}.{1}', variables('GithubHostLabel'), reference('clusterDeploymentSettings').deploymentConfiguration.scaleUnits[0].deploymentData.domainFqdn))]",
+            "SubdomainIsolation": "[variables('SubdomainIsolation')]",
+            "SignupEnabled": "[variables('SignupEnabled')]",
+            "PublicPages": "[variables('PublicPages')]",
+            "ManagePort": "[variables('ManagePort')]",
+            "ApplyTimeoutMinutes": "[variables('ApplyTimeoutMinutes')]",
+            "ReadyTimeoutMinutes": "[variables('ReadyTimeoutMinutes')]",
+            "SkipApply": "[variables('SkipApply')]",
+            "AsyncExecution": "[variables('AsyncExecution')]",
+            "RunCommandName": "[variables('RunCommandName')]"
+          }
+        },
+        "specification": {
+          "components": [
+            {
+              "name": "ghesPostConfig",
+              "type": "armtemplate",
+              "properties": {
+                "template": {
+                  "subscriptionId": "[subscription().subscriptionId]",
+                  "resourceGroupName": "[resourceGroup().name]",
+                  "name": "[variables('ghesPostConfigSpecName')]",
+                  "version": "[variables('ghesSpecVersion')]"
+                }
+              }
+            }
+          ]
+        }
+      },
+      "dependsOn": [
+        "clusterDeploymentSettings",
+        "ghesPostConfigSolutionTemplate",
+        "ghesPostConfigTemplateSpec",
+        "ghesPostConfigTemplateSpecVersion",
+        "keyVault"
       ]
     },
     "keyVault": {
+      "existing": true,
       "type": "Microsoft.KeyVault/vaults",
       "apiVersion": "2023-07-01",
-      "name": "[parameters('KeyVaultName')]",
-      "location": "[variables('Location')]",
-      "properties": {
-        "tenantId": "[variables('TenantId')]",
-        "sku": {
-          "family": "A",
-          "name": "[variables('KeyVaultSkuName')]"
-        },
-        "enableRbacAuthorization": "[variables('EnableRbacAuthorization')]",
-        "enabledForTemplateDeployment": true,
-        "enableSoftDelete": true,
-        "softDeleteRetentionInDays": "[variables('SoftDeleteRetentionInDays')]",
-        "publicNetworkAccess": "Enabled"
-      }
+      "subscriptionId": "[variables('keyVaultSubscriptionId')]",
+      "resourceGroup": "[variables('keyVaultResourceGroupName')]",
+      "name": "[variables('keyVaultName')]"
     },
-    "adminPasswordSecret": {
-      "type": "Microsoft.KeyVault/vaults/secrets",
-      "apiVersion": "2023-07-01",
-      "name": "[format('{0}/{1}', parameters('KeyVaultName'), variables('AdminPasswordSecretName'))]",
-      "properties": {
-        "value": "[parameters('AdminPassword')]",
-        "contentType": "GHES VM administrator password"
-      },
-      "dependsOn": [
-        "keyVault"
-      ]
-    },
-    "managementConsolePasswordSecret": {
-      "type": "Microsoft.KeyVault/vaults/secrets",
-      "apiVersion": "2023-07-01",
-      "name": "[format('{0}/{1}', parameters('KeyVaultName'), variables('ManagementConsolePasswordSecretName'))]",
-      "properties": {
-        "value": "[parameters('ManagementConsolePassword')]",
-        "contentType": "GHES management-console password"
-      },
-      "dependsOn": [
-        "keyVault"
-      ]
-    },
-    "licensePart1Secret": {
-      "type": "Microsoft.KeyVault/vaults/secrets",
-      "apiVersion": "2023-07-01",
-      "name": "[format('{0}/{1}', parameters('KeyVaultName'), variables('LicensePart1SecretName'))]",
-      "properties": {
-        "value": "[variables('licensePart1')]",
-        "contentType": "GHES license base64 (part 1 of 2)"
-      },
-      "dependsOn": [
-        "keyVault"
-      ]
-    },
-    "licensePart2Secret": {
-      "type": "Microsoft.KeyVault/vaults/secrets",
-      "apiVersion": "2023-07-01",
-      "name": "[format('{0}/{1}', parameters('KeyVaultName'), variables('LicensePart2SecretName'))]",
-      "properties": {
-        "value": "[variables('licensePart2')]",
-        "contentType": "GHES license base64 (part 2 of 2)"
-      },
-      "dependsOn": [
-        "keyVault"
-      ]
+    "clusterDeploymentSettings": {
+      "existing": true,
+      "type": "Microsoft.AzureStackHCI/clusters/deploymentSettings",
+      "apiVersion": "2024-04-01",
+      "name": "[format('{0}/default', parameters('clusterName'))]"
     },
     "ghesTemplateSpec": {
       "type": "Microsoft.Resources/templateSpecs",
@@ -1155,8 +1073,8 @@
       "name": "[variables('ghesSpecName')]",
       "location": "[variables('Location')]",
       "properties": {
-        "displayName": "GitHub Enterprise Server on Azure Local",
-        "description": "Self-published GHES infrastructure template used by the Workload Orchestration solution."
+        "displayName": "GitHub Enterprise Server infrastructure on Azure Local",
+        "description": "Stage 1 GHES infrastructure through Arc machine and VM instance creation."
       }
     },
     "ghesTemplateSpecVersion": {
@@ -1165,11 +1083,34 @@
       "name": "[format('{0}/{1}', variables('ghesSpecName'), variables('ghesSpecVersion'))]",
       "location": "[variables('Location')]",
       "properties": {
-        "description": "GHES image, logical network, VM, and post-configuration resources.",
+        "description": "Stage 1 GHES infrastructure through Arc machine and VM instance creation.",
         "mainTemplate": "[variables('ghesTemplate')]"
       },
       "dependsOn": [
         "ghesTemplateSpec"
+      ]
+    },
+    "ghesPostConfigTemplateSpec": {
+      "type": "Microsoft.Resources/templateSpecs",
+      "apiVersion": "2022-02-01",
+      "name": "[variables('ghesPostConfigSpecName')]",
+      "location": "[variables('Location')]",
+      "properties": {
+        "displayName": "GitHub Enterprise Server post-configuration on Azure Local",
+        "description": "Stage 2 private script delivery and Arc Run Command template."
+      }
+    },
+    "ghesPostConfigTemplateSpecVersion": {
+      "type": "Microsoft.Resources/templateSpecs/versions",
+      "apiVersion": "2022-02-01",
+      "name": "[format('{0}/{1}', variables('ghesPostConfigSpecName'), variables('ghesSpecVersion'))]",
+      "location": "[variables('Location')]",
+      "properties": {
+        "description": "Stage 2 private script storage, upload, SAS, and Arc Run Command resources.",
+        "mainTemplate": "[variables('$fxv#0')]"
+      },
+      "dependsOn": [
+        "ghesPostConfigTemplateSpec"
       ]
     },
     "newContext": {
@@ -1215,11 +1156,30 @@
         "contextId": "[variables('effectiveContextId')]",
         "description": "Cloud target for ARM template infrastructure deployment",
         "displayName": "Cloud Infrastructure Target",
-        "hierarchyLevel": "[variables('contextHierarchyName')]"
+        "hierarchyLevel": "[last(if(empty(if(variables('createContext'), createArray(), reference('existingContext').hierarchies)), createArray(createObject('name', variables('contextHierarchyName'), 'description', 'Hierarchy used by the GHES cloud target.')), if(variables('createContext'), createArray(), reference('existingContext').hierarchies))).name]"
       },
       "dependsOn": [
+        "existingContext",
         "newContext",
         "updateExistingContext"
+      ]
+    },
+    "capabilityPropagationDelay": {
+      "type": "Microsoft.Resources/deploymentScripts",
+      "apiVersion": "2023-08-01",
+      "name": "ghes-capability-delay",
+      "location": "[variables('Location')]",
+      "kind": "AzureCLI",
+      "properties": {
+        "azCliVersion": "2.89.1",
+        "scriptContent": "sleep 5",
+        "timeout": "PT5M",
+        "cleanupPreference": "Always",
+        "retentionInterval": "P1D",
+        "forceUpdateTag": "[deployment().name]"
+      },
+      "dependsOn": [
+        "cloudTarget"
       ]
     },
     "ghesSolutionTemplate": {
@@ -1228,11 +1188,14 @@
       "name": "[variables('ghesSolutionTemplateName')]",
       "location": "[variables('Location')]",
       "properties": {
-        "description": "GHES solution template with ARM-resolved Key Vault password references.",
+        "description": "Stage 1 GHES infrastructure solution template.",
         "capabilities": [
           "[variables('infraCapabilityName')]"
         ]
-      }
+      },
+      "dependsOn": [
+        "capabilityPropagationDelay"
+      ]
     },
     "ghesDeployment": {
       "type": "Microsoft.Edge/solutionDeployments",
@@ -1252,8 +1215,164 @@
       },
       "dependsOn": [
         "cloudTarget",
-        "ghesSolutionTemplate::solutionVersion"
+        "ghesSolutionTemplate::solutionVersion",
+        "keyVaultSecrets"
       ]
+    },
+    "ghesPostConfigSolutionTemplate": {
+      "type": "Microsoft.Edge/solutionTemplates",
+      "apiVersion": "2026-03-01",
+      "name": "[variables('ghesPostConfigSolutionTemplateName')]",
+      "location": "[variables('Location')]",
+      "properties": {
+        "description": "Stage 2 GHES private script delivery and post-configuration solution template.",
+        "capabilities": [
+          "[variables('infraCapabilityName')]"
+        ]
+      },
+      "dependsOn": [
+        "capabilityPropagationDelay"
+      ]
+    },
+    "ghesPostConfigDeployment": {
+      "type": "Microsoft.Edge/solutionDeployments",
+      "apiVersion": "2026-05-01-preview",
+      "name": "ghes-postconfig-deploy",
+      "location": "[variables('Location')]",
+      "properties": {
+        "solutionTemplateProperties": {
+          "name": "[variables('ghesPostConfigSolutionTemplateName')]",
+          "version": "[variables('ghesSolutionTemplateVersionName')]"
+        },
+        "targetProperties": {
+          "targetIds": [
+            "[resourceId('Microsoft.Edge/targets', variables('cloudTargetName'))]"
+          ]
+        }
+      },
+      "dependsOn": [
+        "cloudTarget",
+        "deferredKeyVaultRbac",
+        "ghesPostConfigSolutionTemplate::solutionVersion"
+      ]
+    },
+    "keyVaultSecrets": {
+      "type": "Microsoft.Resources/deployments",
+      "apiVersion": "2025-04-01",
+      "name": "ghes-secrets",
+      "subscriptionId": "[variables('keyVaultSubscriptionId')]",
+      "resourceGroup": "[variables('keyVaultResourceGroupName')]",
+      "properties": {
+        "expressionEvaluationOptions": {
+          "scope": "inner"
+        },
+        "mode": "Incremental",
+        "parameters": {
+          "adminPassword": {
+            "value": "[parameters('AdminPassword')]"
+          },
+          "managementConsolePassword": {
+            "value": "[parameters('GithubManagementConsolePassword')]"
+          },
+          "licenseBase64": {
+            "value": "[parameters('LicenseBase64')]"
+          },
+          "adminPasswordSecretName": {
+            "value": "[variables('AdminPasswordSecretName')]"
+          },
+          "managementConsolePasswordSecretName": {
+            "value": "[variables('ManagementConsolePasswordSecretName')]"
+          },
+          "licensePart1SecretName": {
+            "value": "[variables('LicensePart1SecretName')]"
+          },
+          "licensePart2SecretName": {
+            "value": "[variables('LicensePart2SecretName')]"
+          },
+          "keyVaultName": {
+            "value": "[variables('keyVaultName')]"
+          }
+        },
+        "template": {
+          "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+          "contentVersion": "1.0.0.0",
+          "metadata": {
+            "_generator": {
+              "name": "bicep",
+              "version": "0.48.1.52935",
+              "templateHash": "6177309973859106598"
+            }
+          },
+          "parameters": {
+            "adminPassword": {
+              "type": "securestring"
+            },
+            "managementConsolePassword": {
+              "type": "securestring"
+            },
+            "licenseBase64": {
+              "type": "securestring"
+            },
+            "adminPasswordSecretName": {
+              "type": "string"
+            },
+            "managementConsolePasswordSecretName": {
+              "type": "string"
+            },
+            "licensePart1SecretName": {
+              "type": "string"
+            },
+            "licensePart2SecretName": {
+              "type": "string"
+            },
+            "keyVaultName": {
+              "type": "string"
+            }
+          },
+          "variables": {
+            "licenseLength": "[length(parameters('licenseBase64'))]",
+            "licenseHalf": "[div(variables('licenseLength'), 2)]"
+          },
+          "resources": [
+            {
+              "type": "Microsoft.KeyVault/vaults/secrets",
+              "apiVersion": "2023-07-01",
+              "name": "[format('{0}/{1}', parameters('keyVaultName'), parameters('adminPasswordSecretName'))]",
+              "properties": {
+                "value": "[parameters('adminPassword')]",
+                "contentType": "GHES VM administrator password"
+              }
+            },
+            {
+              "type": "Microsoft.KeyVault/vaults/secrets",
+              "apiVersion": "2023-07-01",
+              "name": "[format('{0}/{1}', parameters('keyVaultName'), parameters('managementConsolePasswordSecretName'))]",
+              "properties": {
+                "value": "[parameters('managementConsolePassword')]",
+                "contentType": "GHES management-console password"
+              }
+            },
+            {
+              "type": "Microsoft.KeyVault/vaults/secrets",
+              "apiVersion": "2023-07-01",
+              "name": "[format('{0}/{1}', parameters('keyVaultName'), parameters('licensePart1SecretName'))]",
+              "properties": {
+                "value": "[substring(parameters('licenseBase64'), 0, variables('licenseHalf'))]",
+                "contentType": "GHES license base64 (part 1 of 2)"
+              }
+            },
+            {
+              "type": "Microsoft.KeyVault/vaults/secrets",
+              "apiVersion": "2023-07-01",
+              "name": "[format('{0}/{1}', parameters('keyVaultName'), parameters('licensePart2SecretName'))]",
+              "properties": {
+                "value": "[substring(parameters('licenseBase64'), variables('licenseHalf'), sub(variables('licenseLength'), variables('licenseHalf')))]",
+                "contentType": "GHES license base64 (part 2 of 2)"
+              }
+            }
+          ]
+        }
+      }
     },
     "updateExistingContext": {
       "condition": "[not(variables('createContext'))]",
@@ -1274,7 +1393,7 @@
           "location": "[if(variables('createContext'), createObject('value', variables('Location')), createObject('value', reference('existingContext', '2026-03-01', 'full').location))]",
           "tags": "[if(variables('createContext'), createObject('value', createObject()), createObject('value', coalesce(reference('existingContext', '2026-03-01', 'full').tags, createObject())))]",
           "capabilities": "[if(contains(map(if(variables('createContext'), createArray(), reference('existingContext').capabilities), lambda('capability', lambdaVariables('capability').name)), variables('infraCapabilityName')), if(variables('createContext'), createObject('value', createArray()), createObject('value', reference('existingContext').capabilities)), createObject('value', concat(if(variables('createContext'), createArray(), reference('existingContext').capabilities), createArray(createObject('name', variables('infraCapabilityName'), 'description', 'Capability used by the GHES deployment.', 'state', 'active')))))]",
-          "hierarchies": "[if(variables('createContext'), createObject('value', createArray()), createObject('value', reference('existingContext').hierarchies))]"
+          "hierarchies": "[if(empty(if(variables('createContext'), createArray(), reference('existingContext').hierarchies)), createObject('value', createArray(createObject('name', variables('contextHierarchyName'), 'description', 'Hierarchy used by the GHES cloud target.'))), if(variables('createContext'), createObject('value', createArray()), createObject('value', reference('existingContext').hierarchies)))]"
         },
         "template": {
           "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
@@ -1321,6 +1440,80 @@
       "dependsOn": [
         "existingContext"
       ]
+    },
+    "deferredKeyVaultRbac": {
+      "type": "Microsoft.Resources/deployments",
+      "apiVersion": "2025-04-01",
+      "name": "ghes-deferred-key-vault-rbac",
+      "subscriptionId": "[variables('keyVaultSubscriptionId')]",
+      "resourceGroup": "[variables('keyVaultResourceGroupName')]",
+      "properties": {
+        "expressionEvaluationOptions": {
+          "scope": "inner"
+        },
+        "mode": "Incremental",
+        "parameters": {
+          "keyVaultName": {
+            "value": "[variables('keyVaultName')]"
+          },
+          "machineName": {
+            "value": "[parameters('VmName')]"
+          },
+          "machineSubscriptionId": {
+            "value": "[subscription().subscriptionId]"
+          },
+          "machineResourceGroupName": {
+            "value": "[resourceGroup().name]"
+          },
+          "roleDefinitionId": {
+            "value": "[variables('keyVaultSecretsUserRoleDefinitionId')]"
+          }
+        },
+        "template": {
+          "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+          "contentVersion": "1.0.0.0",
+          "metadata": {
+            "_generator": {
+              "name": "bicep",
+              "version": "0.48.1.52935",
+              "templateHash": "11645292692552584090"
+            }
+          },
+          "parameters": {
+            "keyVaultName": {
+              "type": "string"
+            },
+            "machineName": {
+              "type": "string"
+            },
+            "machineSubscriptionId": {
+              "type": "string"
+            },
+            "machineResourceGroupName": {
+              "type": "string"
+            },
+            "roleDefinitionId": {
+              "type": "string"
+            }
+          },
+          "resources": [
+            {
+              "type": "Microsoft.Authorization/roleAssignments",
+              "apiVersion": "2022-04-01",
+              "scope": "[resourceId('Microsoft.KeyVault/vaults', parameters('keyVaultName'))]",
+              "name": "[guid(resourceId('Microsoft.KeyVault/vaults', parameters('keyVaultName')), extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', parameters('machineSubscriptionId'), parameters('machineResourceGroupName')), 'Microsoft.HybridCompute/machines', parameters('machineName')), parameters('roleDefinitionId'))]",
+              "properties": {
+                "roleDefinitionId": "[subscriptionResourceId('Microsoft.Authorization/roleDefinitions', parameters('roleDefinitionId'))]",
+                "principalId": "[reference(extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', parameters('machineSubscriptionId'), parameters('machineResourceGroupName')), 'Microsoft.HybridCompute/machines', parameters('machineName')), '2023-06-20-preview', 'full').identity.principalId]",
+                "principalType": "ServicePrincipal"
+              }
+            }
+          ]
+        }
+      },
+      "dependsOn": [
+        "ghesDeployment"
+      ]
     }
   },
   "outputs": {
@@ -1329,7 +1522,7 @@
       "metadata": {
         "description": "Resource ID of the Key Vault containing the GHES passwords."
       },
-      "value": "[resourceId('Microsoft.KeyVault/vaults', parameters('KeyVaultName'))]"
+      "value": "[variables('canonicalKeyVaultResourceId')]"
     },
     "keyVaultUri": {
       "type": "string",
@@ -1338,19 +1531,40 @@
       },
       "value": "[reference('keyVault').vaultUri]"
     },
-    "templateSpecVersionId": {
+    "infrastructureTemplateSpecVersionId": {
       "type": "string",
       "metadata": {
-        "description": "Resource ID of the GHES Template Spec version created by this deployment."
+        "description": "Resource ID of the stage 1 infrastructure Template Spec version."
       },
       "value": "[resourceId('Microsoft.Resources/templateSpecs/versions', variables('ghesSpecName'), variables('ghesSpecVersion'))]"
     },
-    "solutionDeploymentId": {
+    "postConfigTemplateSpecVersionId": {
       "type": "string",
       "metadata": {
-        "description": "Resource ID of the Workload Orchestration Solution Deployment."
+        "description": "Resource ID of the stage 2 post-configuration Template Spec version."
+      },
+      "value": "[resourceId('Microsoft.Resources/templateSpecs/versions', variables('ghesPostConfigSpecName'), variables('ghesSpecVersion'))]"
+    },
+    "infrastructureSolutionDeploymentId": {
+      "type": "string",
+      "metadata": {
+        "description": "Resource ID of the stage 1 infrastructure Solution Deployment."
       },
       "value": "[resourceId('Microsoft.Edge/solutionDeployments', 'ghesDeployment')]"
+    },
+    "postConfigSolutionDeploymentId": {
+      "type": "string",
+      "metadata": {
+        "description": "Resource ID of the stage 2 post-configuration Solution Deployment."
+      },
+      "value": "[resourceId('Microsoft.Edge/solutionDeployments', 'ghes-postconfig-deploy')]"
+    },
+    "runCommandResourceId": {
+      "type": "string",
+      "metadata": {
+        "description": "Resource ID of the embedded-template post-configuration Run Command."
+      },
+      "value": "[resourceId('Microsoft.HybridCompute/machines/runCommands', parameters('VmName'), variables('RunCommandName'))]"
     },
     "contextResourceId": {
       "type": "string",

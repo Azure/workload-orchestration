@@ -1,0 +1,23 @@
+{{- $serverNamespace := required "namespaces.server is required" .Values.namespaces.server -}}
+{{- $mongoNamespace := required "namespaces.mongo is required" .Values.namespaces.mongo -}}
+{{- if not (lookup "v1" "Namespace" "" $serverNamespace) }}
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: {{ $serverNamespace }}
+  annotations:
+    "helm.sh/hook": pre-install,pre-upgrade,pre-rollback
+    "helm.sh/hook-weight": "-15"
+    "helm.sh/resource-policy": keep
+{{- end }}
+{{- if not (lookup "v1" "Namespace" "" $mongoNamespace) }}
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: {{ $mongoNamespace }}
+  annotations:
+    "helm.sh/hook": pre-install,pre-upgrade,pre-rollback
+    "helm.sh/hook-weight": "-15"
+    "helm.sh/resource-policy": keep
+{{- end }}

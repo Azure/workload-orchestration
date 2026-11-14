@@ -1,0 +1,15 @@
+{{- $issuerName := .Values.issuer.name -}}
+{{- $issuerNamespace := .Values.namespaces.server -}}
+{{- if and .Values.issuer.enabled (not (lookup "cert-manager.io/v1" "Issuer" $issuerNamespace $issuerName)) }}
+apiVersion: cert-manager.io/v1
+kind: Issuer
+metadata:
+  name: {{ $issuerName }}
+  namespace: {{ $issuerNamespace }}
+  annotations:
+    "helm.sh/hook": pre-install,pre-upgrade,pre-rollback
+    "helm.sh/hook-weight": "-10"
+    "helm.sh/resource-policy": keep
+spec:
+  selfSigned: {}
+{{- end }}

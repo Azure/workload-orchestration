@@ -1,24 +1,24 @@
 targetScope = 'resourceGroup'
 
-@description('Azure region for the Arc cluster and Workload Orchestration resources.')
-param location string
+@description('Azure region for Workload Orchestration resources. Defaults to the resource group region; use a region supported by the WO resource provider.')
+param location string = resourceGroup().location
 
 @description('Name of the Arc-connected AKS cluster in the deployment resource group.')
+@minLength(1)
 param connectClusterName string
 
-@description('Workload Orchestration context resource ID.')
-param contextId string
-
-@description('Capabilities shared by the target and solution templates.')
-param capabilityNames string[] = [
-  'foundry-local'
-]
+@description('Existing Workload Orchestration context resource ID. Leave empty to create a dedicated context for this cluster.')
+param contextId string = ''
 
 @description('Workload Orchestration target name.')
-param targetName string = 'foundry-local-target'
+@minLength(1)
+param targetName string = '${connectClusterName}-foundry-local-target'
+
+@description('Existing certificate-management extension name, or the name to create.')
+param certManagerExtensionName string = 'cert-manager-extension'
 
 @description('Workload Orchestration custom location name.')
-param workloadOrchestrationCustomLocationName string = 'foundry-local-workload-orchestration-location'
+param workloadOrchestrationCustomLocationName string = '${connectClusterName}-wo-cl'
 
 @description('Name of the Workload Orchestration extension installed on the Arc cluster.')
 param workloadOrchestrationExtensionName string = 'workloadorchestration-extension'
@@ -28,18 +28,6 @@ param workloadOrchestrationCustomLocationNamespace string = 'workloadorchestrati
 
 @description('Workload Orchestration extension type.')
 param workloadOrchestrationExtensionType string = 'microsoft.workloadorchestration'
-
-@description('Workload Orchestration release train.')
-param workloadOrchestrationReleaseTrain string = 'stable'
-
-@description('Workload Orchestration extension version.')
-param workloadOrchestrationExtensionVersion string = '2.1.43'
-
-@description('Storage class used by Workload Orchestration Redis.')
-param workloadOrchestrationRedisStorageClass string = 'default'
-
-@description('Persistent volume size used by Workload Orchestration Redis.')
-param workloadOrchestrationRedisStorageSize string = '5Gi'
 
 @description('Foundry inference operator chart repository.')
 param inferenceoperatorChartRepository string = 'mcr.microsoft.com/foundrylocalonazurelocal/helmcharts/helm/inference-operator'
@@ -85,11 +73,34 @@ param modelMemory string = '8Gi'
 @description('Enable the model endpoint.')
 param modelEndpointEnabled bool = false
 
+var workloadOrchestrationReleaseTrain = 'stable'
+var workloadOrchestrationRedisStorageClass = 'default'
+var workloadOrchestrationRedisStorageSize = '5Gi'
+
+var capabilityNames = [
+  'foundry-local'
+]
+
+@export()
+func mergeCapabilities(existingCapabilities array, requiredNames string[]) array => concat(existingCapabilities, map(filter(union(requiredNames, requiredNames), name => !contains(map(existingCapabilities, capability => capability.name), name)), name => {
+  name: name
+  description: 'Capability for Foundry Local workloads.'
+  state: 'active'
+}))
+
+@export()
+func resolveHierarchies(existingHierarchies array) array => empty(existingHierarchies) ? [
+  {
+    name: 'level-1'
+    description: 'Foundry Local deployment level.'
+  }
+] : existingHierarchies
+
 resource connectedCluster 'Microsoft.Kubernetes/connectedClusters@2025-12-01-preview' existing = {
   name: connectClusterName
 }
 resource certManagerExtension 'Microsoft.KubernetesConfiguration/extensions@2022-03-01' = {
-  name: 'cert-manager-extension'
+  name: certManagerExtensionName
   scope: connectedCluster
   properties: {
     extensionType: 'microsoft.certmanagement'
@@ -105,9 +116,8 @@ resource workloadOrchestrationExtension 'Microsoft.KubernetesConfiguration/exten
   ]
   properties: {
     extensionType: workloadOrchestrationExtensionType
-    autoUpgradeMinorVersion: false
+    autoUpgradeMinorVersion: true
     releaseTrain: workloadOrchestrationReleaseTrain
-    version: workloadOrchestrationExtensionVersion
     configurationSettings: {
       'redis.persistentVolume.storageClass': workloadOrchestrationRedisStorageClass
       'redis.persistentVolume.size': workloadOrchestrationRedisStorageSize
@@ -128,6 +138,46 @@ resource workloadOrchestrationCustomLocation 'Microsoft.ExtendedLocation/customL
   }
 }
 
+@onlyIfNotExists()
+resource managedContext 'Microsoft.Edge/contexts@2025-08-01' = if (empty(contextId)) {
+  name: 'foundry-${uniqueString(connectedCluster.id)}'
+  location: location
+  properties: {
+    capabilities: [
+      for capabilityName in capabilityNames: {
+        name: capabilityName
+        description: 'Capability for Foundry Local workloads.'
+        state: 'active'
+      }
+    ]
+    hierarchies: resolveHierarchies([])
+  }
+}
+
+var resolvedContextId = empty(contextId) ? managedContext!.id : contextId
+
+// Read by ID to avoid declaring the Day 0 context twice in the same template.
+var selectedContext = reference(resolvedContextId, '2025-08-01', 'Full')
+
+var mergedCapabilities = mergeCapabilities(selectedContext.properties.capabilities, capabilityNames)
+var effectiveHierarchies = resolveHierarchies(selectedContext.properties.hierarchies)
+
+// A module snapshots the existing state before updating the context at its own scope.
+module contextRegistration './update-context.bicep' = {
+  name: '${uniqueString(connectedCluster.id)}-foundry-context'
+  scope: resourceGroup(split(resolvedContextId, '/')[2], split(resolvedContextId, '/')[4])
+  params: {
+    contextName: last(split(resolvedContextId, '/'))
+    location: selectedContext.location
+    tags: selectedContext.?tags ?? {}
+    capabilities: mergedCapabilities
+    hierarchies: effectiveHierarchies
+    updateRequired: length(mergedCapabilities) > length(selectedContext.properties.capabilities) || empty(selectedContext.properties.hierarchies)
+  }
+}
+
+var effectiveHierarchyLevel = contextRegistration.outputs.hierarchyLevel
+
 resource foundryTarget 'Microsoft.Edge/targets@2026-05-01-preview' = {
   name: targetName
   location: location
@@ -137,10 +187,10 @@ resource foundryTarget 'Microsoft.Edge/targets@2026-05-01-preview' = {
   }
   properties: {
     capabilities: capabilityNames
-    contextId: contextId
+    contextId: resolvedContextId
     description: 'Kubernetes target for Foundry Local'
     displayName: 'Foundry Local Target'
-    hierarchyLevel: 'line'
+    hierarchyLevel: effectiveHierarchyLevel
     solutionScope: 'foundry-local'
     targetSpecification: {
       components: []
@@ -165,6 +215,9 @@ resource foundryTarget 'Microsoft.Edge/targets@2026-05-01-preview' = {
 resource inferenceTemplate 'Microsoft.Edge/solutiontemplates@2026-05-01-preview' = {
   name: 'foundry-local-inference'
   location: location
+  dependsOn: [
+    foundryTarget
+  ]
   properties: {
     description: 'Foundry Local inference operator'
     capabilities: capabilityNames
@@ -214,6 +267,9 @@ resource inferenceDeployment 'Microsoft.Edge/solutiondeployments@2026-05-01-prev
 resource modelTemplate 'Microsoft.Edge/solutiontemplates@2026-05-01-preview' = {
   name: 'foundry-local-model'
   location: location
+  dependsOn: [
+    foundryTarget
+  ]
   properties: {
     description: 'Foundry Local AI model'
     capabilities: capabilityNames
@@ -289,6 +345,9 @@ resource modelDeployment 'Microsoft.Edge/solutiondeployments@2026-05-01-preview'
   }
 }
 
+output contextResourceId string = resolvedContextId
+output hierarchyLevel string = effectiveHierarchyLevel
+output targetCapabilities array = capabilityNames
 output targetId string = foundryTarget.id
 output customLocationId string = workloadOrchestrationCustomLocation.id
 output inferenceDeploymentId string = inferenceDeployment.id
